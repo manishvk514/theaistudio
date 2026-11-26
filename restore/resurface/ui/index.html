@@ -82,6 +82,13 @@ a{color:var(--accent)}
 <main>
 
 <section id="v-find">
+  <div class="card" style="margin-bottom:16px;border-color:var(--accent)">
+    <h3>Start here: search this computer for surviving copies</h3>
+    <p>For photos that are permanently deleted — gone from the phone and from every bin. Looks in every place this computer may have kept a copy without telling you: thumbnail caches, recycle bin, phone backups, chat apps, sync caches, mailboxes, temp files. Your Pictures and Videos folders are read first as "what I still have".</p>
+    <div id="places" class="note"></div>
+    <div class="chk"><input type="checkbox" id="auto-noisy"><span>Also search web-browser caches (finds pictures viewed in Google Photos, WhatsApp Web, iCloud.com — and many unrelated web images)</span></div>
+    <button class="b" onclick="api('auto',{noisy:$('auto-noisy').checked}).then(refresh)">Search this computer</button>
+  </div>
   <div class="grid2">
     <div class="card">
       <h3>Memory card, drive or disk image</h3>
@@ -241,6 +248,7 @@ async function cloudConnect(){
 }
 api("devices").then(d=>{if(d.devices.length)$("devices").innerHTML="Detected: "+d.devices.map(x=>`<a href="#" onclick="$('disk-path').value='${esc(x.path.replace(/\\/g,"\\\\"))}';return false">${esc(x.path)}</a> <span class="tag">${esc(x.label)}${x.size?" · "+size(x.size):""}${x.removable?" · removable":""}</span>`).join(" &nbsp; ");});
 
+api("places").then(d=>{const q=d.places.filter(p=>!p.noisy);$("places").innerHTML=q.length?"Found on this computer: "+q.map(p=>`<span class="tag" title="${esc(p.path)}${p.why?" — "+esc(p.why):""}">${esc(p.label)}</span>`).join(" "):"No known locations detected — add places manually below.";});
 // ---- results
 function filt(){return {state,kind:$("f-kind").value,source:$("f-source").value,lowres:$("f-lowres").value,order:$("f-order").value,q:$("f-q").value,hide_damaged:$("f-damaged").checked?1:"",shadow:$("f-shadow").checked?1:""};}
 function setState(s){state=s;sel.clear();loadItems();refresh();}
@@ -338,9 +346,9 @@ async function loadMap(){
   $("principles").innerHTML=d.principles.map(([t,b])=>`<div class="card"><h3>${esc(t)}</h3><p style="margin:0">${esc(b)}</p></div>`).join("");
   const go={disk:"disk-path",folder:"dev-path",evidence:"ev-path"};
   $("map").innerHTML=d.map.map(m=>`<div class="card"><h3>${esc(m.name)}</h3><span class="tag">odds: ${esc(m.chance)}</span>
-    <p style="margin-top:8px">${esc(m.how)}</p>${m.routes.map(r=>`<div class="route"><span style="flex:1">${esc(r.t)}</span>${r.auto?`<button class="g" onclick="jump('${r.do}')">${r.do.startsWith("cloud")?"Connect":"Scan"}</button>`:`<span class="tag">you, in the app</span>`}</div>`).join("")}
+    <p style="margin-top:8px">${esc(m.how)}</p>${m.routes.map(r=>`<div class="route"><span style="flex:1">${esc(r.t)}</span>${r.auto?`<button class="g" onclick="jump('${r.do}')">${r.do.startsWith("cloud")?"Connect":r.do==="auto"?"Go":"Scan"}</button>`:`<span class="tag">you, in the app</span>`}</div>`).join("")}
     ${m.limits?`<div class="note"><b>Limits:</b> ${esc(m.limits)}</div>`:""}</div>`).join("");
-  window.jump=a=>{show("find");if(a.startsWith("cloud:")){$("cl-prov").value=a.slice(6);cloudHelp();$("cl-id").focus();}else $(go[a]).focus();};
+  window.jump=a=>{show("find");if(a==="auto"){window.scrollTo(0,0);return;}if(a.startsWith("cloud:")){$("cl-prov").value=a.slice(6);cloudHelp();$("cl-id").focus();}else $(go[a]).focus();};
 }
 </script>
 </body>

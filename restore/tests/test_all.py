@@ -224,6 +224,81 @@ class Folders(unittest.TestCase):
         r = rows(eng)[0]
         self.assertEqual((r["name"], r["origin"], r["path"]), ("IMG_0042.JPG", "backup", "CameraRollDomain/Media/DCIM/100APPLE"))
 
+    def test_email_attachments_and_base64(self):
+        import base64
+        import mailbox
+        from email.message import EmailMessage
+        root = os.path.join(TMP, "mailroot")
+        os.makedirs(root)
+
+        def message(subject, name, data, maintype, subtype):
+            m = EmailMessage()
+            m["Subject"], m["From"], m["To"] = subject, "Asha <asha@example.test>", "me@example.test"
+            m["Date"] = "Tue, 03 Mar 2020 10:11:12 +0000"
+            m.set_content("see attached")
+            m.add_attachment(data, maintype=maintype, subtype=subtype, filename=name)
+            return m
+        box = mailbox.mbox(os.path.join(root, "Inbox"))          # Thunderbird-style, no extension
+        box.add(message("no attachment here", "note.txt", b"x" * 900, "text", "plain"))
+        box.add(message("Goa trip", "beach.jpg", FILES["photo_1.jpg"], "image", "jpeg"))
+        box.add(message("the video", "clip.avi", FILES["clip.avi"], "video", "x-msvideo"))
+        box.close()
+        with open(os.path.join(root, "one.eml"), "wb") as f:
+            f.write(message("single", "scan.png", FILES["shot_2.png"], "image", "png").as_bytes())
+        with open(os.path.join(root, "chat-export.json"), "w") as f:
+            json.dump({"messages": [{"text": "hi"}, {"photo": base64.b64encode(FILES["photo_2.jpg"]).decode()}]}, f)
+        with open(os.path.join(root, "contacts.vcf"), "w") as f:
+            b = base64.encodebytes(FILES["shot_1.png"]).decode()
+            f.write("BEGIN:VCARD\nFN:Someone\nPHOTO;ENCODING=b;TYPE=PNG:" + b + "END:VCARD\n")
+        eng = Engine(os.path.join(TMP, "case-mail"))
+        job = eng.start("scan", eng.scan_folder, root, "evidence", wait=True)
+        self.assertEqual(job.status, "done", job.log)
+        by = {r["sha256"]: r for r in rows(eng)}
+        r = by[sha(FILES["photo_1.jpg"])]
+        self.assertEqual((r["name"], r["modified"]), ("beach.jpg", "2020-03-03T10:11:12"))
+        self.assertIn("Goa trip", r["note"])
+        self.assertIn("Asha", r["note"])
+        for n in ("clip.avi", "shot_2.png", "photo_2.jpg", "shot_1.png"):
+            self.assertIn(sha(FILES[n]), by, n)
+        self.assertEqual(len(by), 5)
+        # every one of them can be written back out byte-exact
+        out = os.path.join(TMP, "mail-out")
+        eng.start("restore", eng.restore, [r["id"] for r in rows(eng)], out, wait=True)
+        got = set()
+        for d, _, names in os.walk(out):
+            for n in names:
+                with open(os.path.join(d, n), "rb") as f:
+                    got.add(sha(f.read()))
+        self.assertEqual(got, set(by))
+
+    def test_automatic_search_of_this_computer(self):
+        from PIL import Image
+        from resurface import discover
+        home = os.path.join(TMP, "home")
+        media = os.path.join(TMP, "media")
+        for d in ("Pictures", ".cache/thumbnails/large", ".local/share/Trash/files", ".cache/google-chrome/Default/Cache"):
+            os.makedirs(os.path.join(home, d))
+        shutil.copy(os.path.join(media, "photo_0.jpg"), os.path.join(home, "Pictures", "kept.jpg"))
+        Image.open(os.path.join(media, "photo_0.jpg")).resize((256, 192)).save(os.path.join(home, ".cache/thumbnails/large/a.png"))
+        Image.open(os.path.join(media, "photo_2.jpg")).resize((256, 180)).save(os.path.join(home, ".cache/thumbnails/large/b.png"))
+        shutil.copy(os.path.join(media, "shot_1.png"), os.path.join(home, ".local/share/Trash/files/old.png"))
+        with open(os.path.join(home, ".cache/google-chrome/Default/Cache/f_0001"), "wb") as f:
+            f.write(b"\0" * 100 + FILES["pic.webp"])
+        old_home = os.environ["HOME"]
+        os.environ["HOME"] = home
+        try:
+            self.assertEqual([p["label"] for p in discover.hiding_places()], ["Pictures", "Trash", "Thumbnail cache"])
+            eng = Engine(os.path.join(TMP, "case-auto"))
+            job = eng.start("auto", eng.scan_auto, wait=True)
+            self.assertEqual(job.status, "done", job.log)
+            st = {(r["name"] or r["path"]): r["state"] for r in rows(eng)}
+            self.assertEqual(st, {"kept.jpg": "existing", "a.png": "existing", "b.png": "deleted", "old.png": "deleted"})
+            eng.start("auto", eng.scan_auto, True, wait=True)       # now with browser caches; nothing scanned twice
+            self.assertEqual(len(eng.catalog.sources()), 4)
+            self.assertIn(sha(FILES["pic.webp"]), {r["sha256"] for r in rows(eng, "state='deleted'")})
+        finally:
+            os.environ["HOME"] = old_home
+
     def test_refuses_to_write_into_scanned_folder(self):
         root = os.path.join(TMP, "self")
         os.makedirs(os.path.join(root, ".Trash"))

@@ -316,7 +316,13 @@ class Engine:
                     self._drop(full)
                 elif head[:4] == b"PK\x03\x04" and fname.lower().endswith(".zip"):
                     self._scan_zip(job, full, sid, role, rel)
+                elif residue.mail_kind(fname, head):
+                    self._scan_mail(job, full, sid, rel, residue.mail_kind(fname, head))
+                elif deep and residue.worth_base64(fname, size) and not residue.worth_carving(fname, size):
+                    self._scan_base64(job, full, sid, rel)
                 elif deep and residue.worth_carving(fname, size):
+                    if residue.worth_base64(fname, size):
+                        self._scan_base64(job, full, sid, rel)
                     view = self._src(full)
                     origin = "cache" if ctx["origin"] in ("cache", "trash") else "embedded"
                     page = self._sqlite_blobs(job, full, sid, origin, rel) if head == b"SQLite format 3\0" else None
@@ -326,6 +332,72 @@ class Engine:
                     self._drop(full)
             except (OSError, zipfile.BadZipFile) as e:
                 job.say(f"skipped {rel}: {e}")
+
+    def _scan_mail(self, job, full, sid, rel, kind):
+        """Pictures and videos attached to emails (mbox / .eml / Apple .emlx).
+        Anything ever mailed or received stays in the mailbox long after the
+        original was deleted everywhere else."""
+        n = 0
+        for key, msg in residue.iter_mail(full, kind):
+            if job.cancelled:
+                return
+            meta = residue.mail_meta(msg)
+            for idx, part in enumerate(msg.walk()):
+                if part.is_multipart():
+                    continue
+                fname = part.get_filename() or ""
+                if part.get_content_maintype() not in ("image", "video") and not residue.MEDIA_NAME.search(fname):
+                    continue
+                try:
+                    data = part.get_payload(decode=True)
+                except Exception:
+                    continue
+                if not data or len(data) < 512 or not sniff(data[:16]):
+                    continue
+                self._record(job, BytesSource(data), len(data), "backup", sid,
+                             {"t": "mail", "p": full, "kind": kind, "key": key, "part": idx},
+                             fname, rel, modified=meta["date"], note="email attachment: " + meta["summary"])
+                n += 1
+        if n:
+            job.say(f"{rel}: {n} picture/video attachment(s) in email")
+
+    def _scan_base64(self, job, full, sid, rel):
+        """Pictures stored as base64 text: chat exports, JSON/HTML dumps, web app
+        storage, mail fragments. Invisible to a byte-signature search."""
+        with open(full, "rb") as fh:
+            blob = fh.read()
+        for m in residue.B64_RE.finditer(blob):
+            if job.cancelled:
+                return
+            data = residue.b64_decode(m.group(0))
+            if not data:
+                continue
+            found = probe(BytesSource(data), 0)
+            if found:
+                self._record(job, BytesSource(data[:found.length]), found.length, "embedded", sid,
+                             {"t": "b64", "p": full, "off": m.start(), "len": m.end() - m.start(), "size": found.length},
+                             "", rel, found, note="stored as base64 text inside this file")
+
+    # -- this computer, automatically -------------------------------------
+
+    def scan_auto(self, job, include_noisy=False):
+        from .discover import hiding_places
+        places = hiding_places(include_noisy)
+        if not places:
+            job.say("no known locations found on this computer")
+        known = {os.path.realpath(s["path"]) for s in self.catalog.sources()}
+        for n, pl in enumerate(places):
+            if job.cancelled:
+                return
+            if os.path.realpath(pl["path"]) in known:
+                job.say(f"already searched: {pl['path']}")
+                continue
+            job.say(f"[{n + 1}/{len(places)}] {pl['label']}: {pl['path']}" + (f" - {pl['why']}" if pl["why"] else ""))
+            try:
+                self.scan_folder(job, pl["path"], pl["role"], True, pl["label"])
+            except OSError as e:
+                job.say(f"  skipped: {e}")
+            self.catalog.commit()
 
     def _drop(self, path):
         with self._lock:
@@ -400,6 +472,18 @@ class Engine:
         if loc["t"] == "zip":
             with zipfile.ZipFile(loc["p"]) as z:
                 data = z.read(loc["m"])
+            return BytesSource(data), len(data)
+        if loc["t"] == "mail":
+            for key, msg in residue.iter_mail(loc["p"], loc["kind"], only=loc["key"]):
+                for idx, part in enumerate(msg.walk()):
+                    if idx == loc["part"]:
+                        data = part.get_payload(decode=True)
+                        return BytesSource(data), len(data)
+            raise RuntimeError("email no longer found in mailbox")
+        if loc["t"] == "b64":
+            with open(loc["p"], "rb") as fh:
+                fh.seek(loc["off"])
+                data = residue.b64_decode(fh.read(loc["len"]))[:loc["size"]]
             return BytesSource(data), len(data)
         if loc["t"] == "sqlite":
             db = sqlite3.connect("file:" + urllib.parse.quote(loc["p"]) + "?mode=ro&immutable=1", uri=True)

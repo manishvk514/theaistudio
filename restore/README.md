@@ -38,6 +38,24 @@ iPhone and Android phone). When all copies are gone too, no software can bring i
 
 **Formats:** JPEG, PNG, GIF, WebP, BMP, HEIC/HEIF, AVIF, CR3, MP4, MOV, M4V, 3GP, AVI, MKV, WebM.
 
+### Permanently deleted photos (not on the phone, not in any bin)
+
+The original cannot be undeleted. What can be found is a copy made earlier by something else, so
+the app searches for those:
+
+- **Search this computer** (one button): finds and scans the thumbnail caches, recycle bin, iPhone
+  backups, Phone Link / WhatsApp / iMessage data, Dropbox and Drive caches, mailboxes and temp
+  folders that exist on this machine, with your Pictures/Videos folders as the reference.
+  Optionally browser caches too (pictures viewed in Google Photos, iCloud.com, WhatsApp Web).
+- **Email attachments**: reads mbox, `.eml` and Apple `.emlx` mail and pulls out every attached
+  picture and video with its file name, sender, subject and date.
+- **Base64 text**: pictures stored as text inside chat exports, JSON/HTML dumps and contact cards.
+- **Old devices, cards, drives, backups and exports**: scanned as described in the table above.
+
+"How recovery works" in the app has the full checklist, including the routes only you can take
+(other people's copies, other cloud services, places you posted it). If no copy survives anywhere,
+nothing can recover the picture.
+
 ### Deleted vs. existing
 
 Each finding gets a verdict from evidence, not from guesswork:
@@ -112,11 +130,12 @@ The filesystem tests build real FAT12/16/32, NTFS and exFAT volumes with real dr
 ntfs-3g, exfat-fuse), write media, delete it — including files fragmented around live ones — and
 require byte-exact recovery plus correct deleted/existing separation. Also covered: quick-format
 recovery, raw carving, trash folders, thumbnail matching, SQLite blobs, iOS backup manifests,
-zip exports, and the cloud connectors.
+zip exports, email attachments, base64 media, the automatic search, and the cloud connectors.
 
 **Verified here:** everything above on Linux against generated volumes and files. **Not verified
 here:** the Google Drive and Dropbox connectors against the live services (tested against a local
 mock of their documented APIs — no account was available), raw device access on Windows and macOS,
+the Windows and macOS location lists used by "Search this computer" (only the Linux list ran here),
 and real-world phone dumps. Treat those as untested until you have tried them.
 
 ## Layout
@@ -126,7 +145,8 @@ run.py                    launcher
 resurface/formats.py      structural parsers: where each file ends, dimensions, capture date
 resurface/carve.py        signature carving over any byte stream
 resurface/fat.py exfat.py ntfs.py volumes.py    filesystem parsers, partition tables
-resurface/residue.py      trash folders, caches, iOS backups, Takeout sidecars
+resurface/residue.py      trash folders, caches, iOS backups, Takeout sidecars, email, base64
+resurface/discover.py     known hiding places on Windows / macOS / Linux
 resurface/catalog.py      findings database and the deleted/existing verdict
 resurface/engine.py       scans, thumbnails, restore
 resurface/cloud/          Google Drive, Dropbox, OAuth

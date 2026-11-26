@@ -15,8 +15,11 @@ def make_media(outdir: str, count: int = 3, seed: int = 7) -> dict:
     files = {}
 
     def noise(w, h):
-        img = Image.frombytes("RGB", (w, h), rnd.randbytes(w * h * 3))
-        return img.resize((w * 2, h * 2))
+        # a picture with real large-scale structure (like a photo) plus grain, so
+        # files are big and look-alike matching has something to recognise
+        grain = Image.frombytes("RGB", (w, h), rnd.randbytes(w * h * 3)).resize((w * 2, h * 2))
+        scene = Image.frombytes("RGB", (8, 6), rnd.randbytes(8 * 6 * 3)).resize((w * 2, h * 2), Image.BICUBIC)
+        return Image.blend(scene, grain, 0.4)
 
     for i in range(count):
         img = noise(320 + 40 * i, 240 + 20 * i)

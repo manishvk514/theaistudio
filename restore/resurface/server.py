@@ -129,6 +129,11 @@ class App:
             else:
                 job = e.start(f"Scanning {os.path.basename(path.rstrip('/' + chr(92))) or path}", e.scan_folder, path, role, True, a.get("label") or None)
             return job.as_dict()
+        if name == "places":
+            from .discover import hiding_places
+            return {"places": hiding_places(True)}
+        if name == "auto":
+            return e.start("Searching this computer's hiding places", e.scan_auto, bool(a.get("noisy"))).as_dict()
         if name == "cloud_connect":
             prov = a.get("provider")
             if prov not in cloud.PROVIDERS:

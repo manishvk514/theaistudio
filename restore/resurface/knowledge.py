@@ -28,6 +28,25 @@ PRINCIPLES = [
 ]
 
 MAP = [
+    {"id": "gone", "name": "Permanently deleted: not on the phone, not in any bin", "chance": "depends entirely on whether a copy survives",
+     "how": "The original cannot be undeleted - on a phone its encryption key is destroyed, in a cloud the provider has purged it. "
+            "What can still be found is a copy made earlier by some other mechanism. Work down this list; each line is a separate chance.",
+     "routes": [
+         {"t": "This computer: thumbnail caches, recycle bin, phone backups, chat apps, sync caches, mailboxes ('Search this computer' does all of these)", "do": "auto", "auto": True},
+         {"t": "An old phone, tablet or laptop that used the same account. Keep it OFFLINE (airplane mode) so it cannot sync the deletion, then copy its storage and scan it", "do": "folder", "auto": True},
+         {"t": "The memory card that was in the phone or camera at the time, even if since formatted", "do": "disk", "auto": True},
+         {"t": "Any old disk, USB stick or external drive the photos ever passed through", "do": "disk", "auto": True},
+         {"t": "Email: anything you ever sent or received as an attachment. Export the mailbox (Google Takeout > Mail, or your mail program's folder) and scan it", "do": "evidence", "auto": True},
+         {"t": "Chat exports and other account downloads: WhatsApp 'Export chat', Telegram export, Snapchat My Data, Facebook/Instagram 'Download your information', Google Takeout", "do": "evidence", "auto": True},
+         {"t": "Old backups: iPhone backups on a computer, Windows File History, Time Machine, NAS, a backup drive", "do": "evidence", "auto": True},
+         {"t": "Pictures viewed in a browser (Google Photos, iCloud.com, WhatsApp Web) can remain in the browser cache - tick the browser option in 'Search this computer'", "do": "auto", "auto": True},
+         {"t": "Other cloud services the phone may have uploaded to without you remembering: Google Drive, Dropbox, OneDrive camera upload, Amazon Photos, Samsung/Xiaomi/Huawei cloud", "do": "manual"},
+         {"t": "Other people: whoever you sent it to, shared albums, partner sharing, family group chats - their copy is unaffected by your deletion", "do": "manual"},
+         {"t": "Places you posted or uploaded it: social media, messaging profile pictures, print/photo-book services, marketplace listings", "do": "manual"},
+         {"t": "Provider support, only if very recent: Google Drive has a file-recovery request for consumer accounts that sometimes works shortly after a permanent deletion. Ask at once; do not count on it", "do": "manual"},
+     ],
+     "limits": "If none of these holds a copy, the picture no longer exists anywhere and cannot be recovered by any software or service. "
+               "Paid 'recovery' apps that claim to restore permanently deleted photos from a modern phone's internal storage only find the same thumbnails and caches."},
     {"id": "card", "name": "Memory card / USB drive / camera", "chance": "high",
      "how": "FAT32/exFAT. Delete = mark the directory entry and free the clusters. Content untouched, no TRIM on most cards.",
      "routes": [

@@ -132,6 +132,15 @@ def takeout_sidecar(full: str) -> dict:
     return {}
 
 
+TEXT_EXT = {".txt", ".json", ".xml", ".html", ".htm", ".csv", ".log", ".js", ".plist", ".md", ".vcf", ".mht", ".mhtml"}
+
+
+def worth_base64(fname: str, size: int) -> bool:
+    """Text-like or unknown files may carry pictures as base64 (exports, contact cards, web storage)."""
+    ext = os.path.splitext(fname)[1].lower()
+    return 1024 <= size <= (256 << 20) and (ext in TEXT_EXT or ext not in BORING_EXT)
+
+
 def worth_carving(fname: str, size: int) -> bool:
     """Should we look *inside* this non-media file for embedded pictures?"""
     if size < 2048 or size > (8 << 30):
@@ -181,3 +190,83 @@ def ios_context(entry, role: str) -> dict:
     ctx["name"] = os.path.basename(rel)
     ctx["path"] = domain + "/" + os.path.dirname(rel)
     return ctx
+
+
+# -- email ----------------------------------------------------------------------
+
+MEDIA_NAME = re.compile(r"(?i)\.(jpe?g|png|gif|webp|heic|heif|bmp|mp4|mov|m4v|3gp|avi|mkv|webm)$")
+
+
+def mail_kind(fname: str, head: bytes) -> str:
+    low = fname.lower()
+    if low.endswith(".emlx"):
+        return "emlx"
+    if low.endswith(".eml"):
+        return "eml"
+    if head[:5] == b"From " and (low.endswith((".mbox", ".mbx")) or "." not in low or low.endswith(".sbd")):
+        return "mbox"          # Thunderbird folders are extension-less mbox files
+    if low.endswith(".mbox") and head[:5] == b"From ":
+        return "mbox"
+    return ""
+
+
+def iter_mail(path: str, kind: str, only=None):
+    """Yield (key, email.message.Message)."""
+    import email
+    import mailbox
+    if kind == "mbox":
+        box = mailbox.mbox(path, create=False)
+        try:
+            keys = [only] if only is not None else box.keys()
+            for k in keys:
+                try:
+                    yield k, box.get_message(k)
+                except Exception:
+                    continue
+        finally:
+            box.close()
+        return
+    with open(path, "rb") as fh:
+        raw = fh.read()
+    if kind == "emlx":              # Apple Mail: first line is the byte count of the message
+        first, _, rest = raw.partition(b"\n")
+        raw = rest[: int(first.strip() or 0) or None] if first.strip().isdigit() else raw
+    try:
+        yield 0, email.message_from_bytes(raw)
+    except Exception:
+        return
+
+
+def mail_meta(msg) -> dict:
+    import email.header
+    import email.utils
+
+    def text(v):
+        try:
+            return str(email.header.make_header(email.header.decode_header(v or "")))[:120]
+        except Exception:
+            return (v or "")[:120]
+    date = ""
+    try:
+        d = email.utils.parsedate_to_datetime(msg.get("Date", ""))
+        date = d.strftime("%Y-%m-%dT%H:%M:%S")
+    except Exception:
+        pass
+    return {"date": date, "summary": f"\"{text(msg.get('Subject'))}\" from {text(msg.get('From'))}"}
+
+
+# -- base64-encoded media inside text/binary files -------------------------------
+
+# base64 spellings of the JPEG, PNG, GIF, RIFF and ISO-BMFF ('....ftyp') signatures
+B64_RE = re.compile(rb"(?:/9j/|iVBORw0KGgo|R0lGOD[lk]h|UklGR|AAAA[A-Za-z0-9+/]{4}eX)[A-Za-z0-9+/\r\n]{400,}={0,2}")
+
+
+def b64_decode(chunk: bytes) -> bytes:
+    import base64
+    import binascii
+    chunk = chunk.replace(b"\r", b"").replace(b"\n", b"")
+    chunk = chunk[: len(chunk.rstrip(b"=")) // 4 * 4] if len(chunk) % 4 else chunk
+    try:
+        return base64.b64decode(chunk, validate=False)
+    except (binascii.Error, ValueError):
+        return b""
