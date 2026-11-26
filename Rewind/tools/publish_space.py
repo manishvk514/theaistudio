@@ -16,7 +16,7 @@ import sys
 import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SKIP_DIRS = {"__pycache__", "assets"}          # assets = Android/Termux installers, not used in the cloud
+SKIP_DIRS = {"__pycache__", "assets", "icons"}   # installers and binary icons are not needed in the cloud
 SKIP_FILES = {".DS_Store"}
 
 

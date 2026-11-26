@@ -57,10 +57,12 @@ and overall flow all feel rough. He wants to continue here in Claude Code.
 - Tests added: `test_space.py` (42), `test_disk.py` (12, real FAT32/NTFS/exFAT built with mtools/ntfs-3g/exfat-fuse),
   `test_dropbox.py` (9). All suites pass in the Linux sandbox. `tests/package.json` makes Node treat the UI tests as
   CommonJS (the parent repo is ESM).
-- Not verified anywhere real: live Hugging Face Space (the session could not reach huggingface.co at the time of
-  writing; see section 11), live Google/Microsoft/Dropbox sign-in completion through the paste flow, claude.ai adding the
-  connector, Claude Desktop on macOS, Docker image build (no Docker daemon in the sandbox; the staged Space folder was run
-  directly and its requirements installed in a clean venv).
+- **Live:** https://huggingface.co/spaces/manishvk18/rewind (built and RUNNING 26 Nov 2026). Probed from outside:
+  /health, sign-in page, HF login redirect, OAuth metadata, client registration (201), /mcp 401 with resource_metadata,
+  API 403 without login. Startup log confirms base URL, allowed user manishvk18, signing secret present.
+- Not verified yet: a real Hugging Face sign-in and claude.ai adding the connector (needs the owner in a browser), live
+  Google/Microsoft/Dropbox sign-in completion through the paste flow, Claude Desktop on macOS, persistence (no /data
+  bucket attached yet: results reset when the Space restarts or sleeps).
 
 ## 2. Status in one table
 
