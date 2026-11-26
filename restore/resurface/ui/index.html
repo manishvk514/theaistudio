@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resurface</title>
+<style>
+:root{--bg:#f6f5f1;--panel:#fff;--ink:#1c1b19;--mute:#6b6861;--line:#e2dfd7;--accent:#0b6e4f;--accent-ink:#fff;--warn:#a85a00;--bad:#a3261d;--chip:#eeece5;--shadow:0 1px 2px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.05)}
+@media (prefers-color-scheme:dark){:root{--bg:#141413;--panel:#1e1e1c;--ink:#ecebe6;--mute:#9a978f;--line:#32312d;--accent:#3fb98c;--accent-ink:#08140f;--warn:#e0a04a;--bad:#ef7b70;--chip:#2a2926;--shadow:none}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;align-items:center;gap:20px;padding:14px 24px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:5;flex-wrap:wrap}
+h1{font-size:19px;margin:0;letter-spacing:-.01em}
+h1 small{font-weight:400;color:var(--mute);font-size:13px;margin-left:8px}
+nav{display:flex;gap:4px;margin-left:auto}
+nav button{background:none;border:0;color:var(--mute);padding:8px 14px;border-radius:8px;font:inherit;cursor:pointer}
+nav button.on{background:var(--chip);color:var(--ink);font-weight:600}
+main{max-width:1240px;margin:0 auto;padding:24px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;box-shadow:var(--shadow)}
+.card h3{margin:0 0 4px;font-size:16px}
+.card p{margin:0 0 12px;color:var(--mute);font-size:13.5px}
+label{display:block;font-size:12.5px;color:var(--mute);margin:8px 0 3px}
+input[type=text],input[type=password],select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row>input[type=text]{flex:1;min-width:140px}
+button.b{background:var(--accent);color:var(--accent-ink);border:0;border-radius:8px;padding:8px 14px;font:inherit;font-weight:600;cursor:pointer}
+button.g{background:var(--chip);color:var(--ink);border:0;border-radius:8px;padding:8px 12px;font:inherit;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}
+.chk{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--mute);margin:8px 0}
+.stats{display:flex;gap:10px;flex-wrap:wrap}
+.stat{font-size:13px;color:var(--mute)} .stat b{color:var(--ink);font-size:15px}
+.job{border-top:1px solid var(--line);padding:10px 0;font-size:13.5px}
+.bar{height:6px;background:var(--chip);border-radius:3px;overflow:hidden;margin:6px 0}
+.bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .3s}
+.log{font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;color:var(--mute);white-space:pre-wrap;max-height:130px;overflow:auto}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tabs button{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:7px 14px;font:inherit;cursor:pointer}
+.tabs button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.filters select,.filters input[type=text]{width:auto}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px}
+.tile{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;cursor:pointer}
+.tile.sel{outline:3px solid var(--accent)}
+.tile .ph{aspect-ratio:1;background:var(--chip);display:flex;align-items:center;justify-content:center;color:var(--mute);font-weight:700;font-size:20px;text-transform:uppercase}
+.tile img{width:100%;aspect-ratio:1;object-fit:cover;display:block}
+.tile .cap{padding:6px 8px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .sub{padding:0 8px 7px;font-size:11px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile input{position:absolute;top:8px;left:8px;width:18px;height:18px}
+.badge{position:absolute;top:8px;right:8px;font-size:10.5px;padding:2px 6px;border-radius:5px;background:rgba(0,0,0,.65);color:#fff}
+.badge.w{background:var(--warn)} .badge.x{background:var(--bad)}
+.vid{position:absolute;left:8px;bottom:52px;background:rgba(0,0,0,.65);color:#fff;font-size:11px;padding:1px 6px;border-radius:5px}
+.actions{position:sticky;bottom:0;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:16px;box-shadow:var(--shadow)}
+.empty{padding:48px 16px;text-align:center;color:var(--mute)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:20;padding:16px}
+.modal.on{display:flex}
+.sheet{background:var(--panel);border-radius:14px;max-width:980px;width:100%;max-height:92vh;overflow:auto;padding:18px}
+.sheet img,.sheet video{max-width:100%;max-height:62vh;display:block;margin:0 auto 12px;border-radius:8px;background:#000}
+dl{display:grid;grid-template-columns:130px 1fr;gap:4px 12px;font-size:13px;margin:0}
+dt{color:var(--mute)} dd{margin:0;word-break:break-word}
+.fs{max-height:50vh;overflow:auto;border:1px solid var(--line);border-radius:8px;margin:10px 0}
+.fs div{padding:6px 10px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13.5px;display:flex;justify-content:space-between;gap:10px}
+.fs div:hover{background:var(--chip)}
+.route{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-top:1px solid var(--line);font-size:13.5px}
+.route button{flex:none;font-size:12px;padding:4px 9px}
+.tag{font-size:11px;padding:2px 7px;border-radius:5px;background:var(--chip);color:var(--mute);white-space:nowrap}
+.note{font-size:12.5px;color:var(--mute);margin-top:8px}
+.err{color:var(--bad);font-size:13px;margin-top:6px}
+a{color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Resurface <small>find what was deleted</small></h1>
+  <div class="stats" id="stats"></div>
+  <nav>
+    <button data-v="find" class="on">1 · Add places to search</button>
+    <button data-v="results">2 · Results</button>
+    <button data-v="map">How recovery works</button>
+  </nav>
+</header>
+<main>
+
+<section id="v-find">
+  <div class="grid2">
+    <div class="card">
+      <h3>Memory card, drive or disk image</h3>
+      <p>Reads deleted file records and rebuilds files from unallocated space. Works best on SD cards, USB sticks, cameras and hard disks.</p>
+      <label>Device or image file</label>
+      <div class="row"><input type="text" id="disk-path" placeholder="/dev/sdb, \\.\E:, or card.img"><button class="g" onclick="pick('disk-path',true)">Browse</button></div>
+      <div id="devices" class="note"></div>
+      <div class="chk"><input type="checkbox" id="disk-deep"><span>Thorough: also search off sector boundaries (slower)</span></div>
+      <button class="b" onclick="scan('disk')">Scan</button>
+      <div class="note">Raw devices need administrator/root rights. The source is only ever read, never written.</div>
+    </div>
+    <div class="card">
+      <h3>Phone storage or computer folder</h3>
+      <p>Searches trash and recycle folders, thumbnail stores, app caches (WhatsApp, Telegram, Snapchat…) and looks inside databases for embedded pictures. Files that are simply there count as "still existing".</p>
+      <label>Folder</label>
+      <div class="row"><input type="text" id="dev-path" placeholder="Copy of phone storage, user folder, mounted drive"><button class="g" onclick="pick('dev-path')">Browse</button></div>
+      <button class="b" style="margin-top:12px" onclick="scan('device')">Scan</button>
+    </div>
+    <div class="card">
+      <h3>Backup or export from the past</h3>
+      <p>Google Takeout, iPhone/iTunes backup, Snapchat "My Data", Telegram export, an old disk copy, a .zip. Everything in it that no longer exists in your current library is reported as deleted.</p>
+      <label>Folder or .zip</label>
+      <div class="row"><input type="text" id="ev-path" placeholder="Takeout folder, MobileSync backup, export.zip"><button class="g" onclick="pick('ev-path',true)">Browse</button></div>
+      <button class="b" style="margin-top:12px" onclick="scan('evidence')">Scan</button>
+    </div>
+    <div class="card">
+      <h3>What I still have</h3>
+      <p>Your current photo library. Used as the reference for separating deleted from existing — nothing here is ever reported as deleted.</p>
+      <label>Folder</label>
+      <div class="row"><input type="text" id="cur-path" placeholder="Pictures folder, current phone copy"><button class="g" onclick="pick('cur-path')">Browse</button></div>
+      <button class="b" style="margin-top:12px" onclick="scan('current')">Scan</button>
+    </div>
+    <div class="card">
+      <h3>Cloud account</h3>
+      <p>Lists the account's trash and its existing pictures. Deleted items can be downloaded or put back in place.</p>
+      <label>Service</label>
+      <select id="cl-prov" onchange="cloudHelp()"><option value="gdrive">Google Drive</option><option value="dropbox">Dropbox</option></select>
+      <label>Sign in with your own OAuth app</label>
+      <div class="row"><input type="text" id="cl-id" placeholder="Client ID / app key"><input type="password" id="cl-secret" placeholder="Client secret (Google)"></div>
+      <label>…or paste an access token</label>
+      <input type="password" id="cl-token" placeholder="Access token">
+      <div class="row" style="margin-top:12px"><button class="b" onclick="cloudConnect()">Connect</button></div>
+      <div class="note" id="cl-help"></div>
+      <div class="err" id="cl-err"></div>
+    </div>
+    <div class="card">
+      <h3>Google Photos, OneDrive, iCloud, WhatsApp, Snapchat, Telegram</h3>
+      <p>These services give no outside program access to their deleted items, so there is nothing to "connect". What works is their own trash (while it lasts) plus the copies left on devices and in backups — which this app searches.</p>
+      <button class="g" onclick="show('map')">Show the routes for each one</button>
+    </div>
+  </div>
+  <div class="err" id="scan-err"></div>
+  <div class="card" style="margin-top:16px">
+    <h3>Searched places</h3>
+    <div id="sources" class="note">Nothing yet.</div>
+    <div id="jobs"></div>
+  </div>
+</section>
+
+<section id="v-results" hidden>
+  <div class="tabs" id="state-tabs"></div>
+  <div class="filters">
+    <select id="f-kind"><option value="">Pictures + videos</option><option value="image">Pictures</option><option value="video">Videos</option></select>
+    <select id="f-source"><option value="">All places</option></select>
+    <select id="f-lowres"><option value="">Any size</option><option value="hide">Hide thumbnails (≤640px)</option><option value="only">Only thumbnails</option></select>
+    <select id="f-order"><option value="taken">Newest first</option><option value="size">Largest first</option><option value="name">By name</option><option value="found">Order found</option></select>
+    <input type="text" id="f-q" placeholder="Search name, folder, note">
+    <label class="chk" style="margin:0"><input type="checkbox" id="f-damaged" checked>Hide damaged</label>
+    <label class="chk" style="margin:0"><input type="checkbox" id="f-shadow">Show lower-quality duplicates</label>
+  </div>
+  <div id="summary" class="note" style="margin-bottom:10px"></div>
+  <div class="tiles" id="tiles"></div>
+  <div class="empty" id="empty" hidden></div>
+  <div style="text-align:center;margin:16px"><button class="g" id="more" onclick="loadItems(true)" hidden>Show more</button></div>
+  <div class="actions">
+    <div class="row">
+      <span id="selinfo" style="font-size:13.5px"></span>
+      <button class="g" onclick="selectAll()">Select shown</button>
+      <button class="g" onclick="sel.clear();renderSel()">Clear</button>
+      <input type="text" id="dest" placeholder="Save recovered files to… (a different drive than the one scanned)">
+      <button class="g" onclick="pick('dest')">Browse</button>
+      <button class="b" onclick="restore(false)">Save selected</button>
+      <button class="g" onclick="restore(true)">Save everything in this view</button>
+      <button class="g" id="inplace" onclick="restoreInPlace()" hidden>Put back in cloud account</button>
+    </div>
+    <div class="err" id="res-err"></div>
+  </div>
+</section>
+
+<section id="v-map" hidden>
+  <div class="grid2" id="principles"></div>
+  <h3 style="margin:24px 0 10px">Where to look, by app and device</h3>
+  <div class="grid2" id="map"></div>
+</section>
+</main>
+
+<div class="modal" id="lightbox" onclick="if(event.target===this)closeModal()"><div class="sheet" id="lb"></div></div>
+<div class="modal" id="picker" onclick="if(event.target===this)closeModal()"><div class="sheet" style="max-width:640px">
+  <h3 style="margin:0 0 6px">Choose</h3><div class="note" id="pk-path"></div><div class="fs" id="pk-list"></div>
+  <div class="row"><button class="b" id="pk-use">Use this folder</button><button class="g" onclick="closeModal()">Cancel</button></div>
+</div></div>
+
+<script>
+const K="__TOKEN__";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const size=n=>n>=1e9?(n/1e9).toFixed(2)+" GB":n>=1e6?(n/1e6).toFixed(1)+" MB":n>=1e3?(n/1e3).toFixed(0)+" kB":n+" B";
+async function api(name,body){
+  const opt=body?{method:"POST",body:JSON.stringify(body),headers:{"X-Resurface-Token":K,"Content-Type":"application/json"}}:{headers:{"X-Resurface-Token":K}};
+  const r=await fetch("/api/"+name,opt);const d=await r.json();
+  if(!r.ok)throw new Error(d.error||r.statusText);return d;
+}
+let view="find",state="deleted",items=[],total=0,sel=new Set(),st=null,busy=false,lastDone=0;
+const STATES=[["deleted","Deleted — recoverable"],["existing","Still existing"],["unsorted","Unsorted"]];
+
+function show(v){view=v;for(const s of ["find","results","map"])$("v-"+s).hidden=s!==v;
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+  if(v==="results")loadItems();if(v==="map")loadMap();}
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>show(b.dataset.v));
+
+async function refresh(){
+  try{st=await api("state");}catch(e){return;}
+  const c=st.counts;
+  $("stats").innerHTML=`<span class="stat"><b>${c.deleted.n}</b> deleted found</span><span class="stat"><b>${c.existing.n}</b> still existing</span>`+(c.unsorted.n?`<span class="stat"><b>${c.unsorted.n}</b> unsorted</span>`:"");
+  $("sources").innerHTML=st.sources.length?st.sources.map(s=>`<div class="row" style="justify-content:space-between;padding:5px 0"><span><b>${esc(s.label)}</b> <span class="tag">${esc({device:"device",current:"current library",evidence:"backup / export",cloud:"cloud"}[s.role]||s.type)}</span> · ${s.items} items<br><span class="note">${esc(s.path)}</span></span><button class="g" onclick="removeSource(${s.id})">Remove</button></div>`).join(""):"Nothing yet.";
+  const jobs=st.jobs.slice().reverse();
+  $("jobs").innerHTML=jobs.map(j=>{const pct=j.total?Math.min(100,j.done/j.total*100):(j.status==="running"?8:100);
+    return `<div class="job"><div class="row" style="justify-content:space-between"><span><b>${esc(j.title)}</b> — ${esc(j.status)}${j.found?` · ${j.found} found`:""} · ${j.elapsed}s</span>${j.status==="running"?`<button class="g" onclick="api('cancel',{id:${j.id}})">Stop</button>`:""}</div>
+    ${j.status==="running"?`<div class="bar"><i style="width:${pct}%"></i></div><div class="note">${esc(j.stage)}</div>`:""}<div class="log">${esc(j.log.join("\n"))}</div></div>`}).join("");
+  const done=st.jobs.filter(j=>j.status!=="running").length;
+  if(done!==lastDone){lastDone=done;if(view==="results")loadItems();}
+  $("state-tabs").innerHTML=STATES.map(([k,l])=>`<button class="${k===state?"on":""}" onclick="setState('${k}')">${l} · ${c[k].n}</button>`).join("");
+  const fs=$("f-source"),cur=fs.value;fs.innerHTML='<option value="">All places</option>'+st.sources.map(s=>`<option value="${s.id}">${esc(s.label)}</option>`).join("");fs.value=cur;
+  if(!st.caps.pillow&&!window._warned){window._warned=1;$("scan-err").innerHTML='<span style="color:var(--warn)">Tip: install Pillow (<code>pip install pillow</code>) for thumbnails and look-alike matching between thumbnails and originals.</span>';}
+}
+setInterval(refresh,1200);refresh();
+
+async function scan(kind){
+  $("scan-err").textContent="";
+  const map={disk:["disk-path","device","disk"],device:["dev-path","device",""],evidence:["ev-path","evidence",""],current:["cur-path","current",""]}[kind];
+  try{await api("scan",{path:$(map[0]).value,role:map[1],mode:map[2],deep:$("disk-deep").checked});refresh();}
+  catch(e){$("scan-err").textContent=e.message;}
+}
+async function removeSource(id){if(confirm("Remove this place and its findings from the list? (No files are touched.)")){await api("remove_source",{id});refresh();}}
+function cloudHelp(){
+  const p=$("cl-prov").value,r=st?st.redirect:"http://localhost:8765/oauth/callback";
+  $("cl-help").innerHTML=p==="gdrive"
+   ?`Google requires each app to be registered. In <b>Google Cloud Console</b>: create a project → enable <i>Google Drive API</i> → OAuth consent screen (add yourself as test user) → Credentials → OAuth client ID, type <i>Desktop app</i>. Paste its client ID and secret here. Redirect used: <code>${esc(r)}</code>. The token is kept in memory only.`
+   :`In the <b>Dropbox App Console</b>: create an app (Scoped access, Full Dropbox), tick <i>files.metadata.read</i>, <i>files.content.read</i>, <i>files.content.write</i>, add redirect URI <code>${esc(r)}</code>, then paste the app key here — or press “Generate access token” there and paste the token below.`;
+}
+setTimeout(cloudHelp,1500);
+async function cloudConnect(){
+  $("cl-err").textContent="";
+  try{const d=await api("cloud_connect",{provider:$("cl-prov").value,client_id:$("cl-id").value,client_secret:$("cl-secret").value,token:$("cl-token").value});
+    if(d.url)window.open(d.url,"_blank");$("cl-token").value="";refresh();}
+  catch(e){$("cl-err").textContent=e.message;}
+}
+api("devices").then(d=>{if(d.devices.length)$("devices").innerHTML="Detected: "+d.devices.map(x=>`<a href="#" onclick="$('disk-path').value='${esc(x.path.replace(/\\/g,"\\\\"))}';return false">${esc(x.path)}</a> <span class="tag">${esc(x.label)}${x.size?" · "+size(x.size):""}${x.removable?" · removable":""}</span>`).join(" &nbsp; ");});
+
+// ---- results
+function filt(){return {state,kind:$("f-kind").value,source:$("f-source").value,lowres:$("f-lowres").value,order:$("f-order").value,q:$("f-q").value,hide_damaged:$("f-damaged").checked?1:"",shadow:$("f-shadow").checked?1:""};}
+function setState(s){state=s;sel.clear();loadItems();refresh();}
+for(const id of ["f-kind","f-source","f-lowres","f-order","f-damaged","f-shadow"])$(id).onchange=()=>loadItems();
+let qt;$("f-q").oninput=()=>{clearTimeout(qt);qt=setTimeout(()=>loadItems(),300);};
+async function loadItems(more){
+  if(busy)return;busy=true;
+  try{
+    const f=filt();f.offset=more?items.length:0;f.limit=120;
+    const d=await api("items?"+new URLSearchParams(f));
+    items=more?items.concat(d.items):d.items;total=d.total;
+    $("summary").textContent=total?`${total} item${total===1?"":"s"}, ${size(d.bytes)}`:"";
+    $("tiles").innerHTML=items.map(tile).join("");
+    $("more").hidden=items.length>=total;
+    const e=$("empty");e.hidden=total>0;
+    e.innerHTML={deleted:"No deleted pictures or videos found yet. Add a place to search in step 1 — the more places, the better the odds.",existing:"Nothing here yet. Add your current library so deleted items can be told apart from ones you still have.",unsorted:"Nothing unsorted."}[state];
+    renderSel();
+  }finally{busy=false;}
+}
+function badge(it){
+  if(it.quality==="damaged")return '<span class="badge x">damaged</span>';
+  if(it.kind==="image"&&it.width&&it.width<=640&&it.height<=640)return '<span class="badge w">thumbnail</span>';
+  if(it.restored)return '<span class="badge">saved</span>';
+  return "";
+}
+function tile(it){
+  const name=it.name||("recovered #"+it.id);
+  return `<div class="tile ${sel.has(it.id)?"sel":""}" data-id="${it.id}" onclick="openItem(${it.id})">
+  <img loading="lazy" src="/api/thumb/${it.id}?k=${K}" alt="" onerror="this.outerHTML='<div class=ph>${esc(it.ext)}</div>'">
+  <input type="checkbox" ${sel.has(it.id)?"checked":""} onclick="event.stopPropagation();toggle(${it.id},this.checked)">${badge(it)}${it.kind==="video"?'<span class="vid">▶ video</span>':""}
+  <div class="cap" title="${esc(name)}">${esc(name)}</div><div class="sub">${esc((it.taken||it.modified||"").slice(0,10)||"no date")} · ${size(it.size)}${it.width?` · ${it.width}×${it.height}`:""}</div></div>`;
+}
+function toggle(id,on){on?sel.add(id):sel.delete(id);renderSel();}
+function selectAll(){items.forEach(i=>sel.add(i.id));renderSel();}
+function renderSel(){
+  $("selinfo").textContent=sel.size?`${sel.size} selected`:"";
+  document.querySelectorAll(".tile").forEach(t=>{const on=sel.has(+t.dataset.id);t.classList.toggle("sel",on);t.querySelector("input").checked=on;});
+  $("inplace").hidden=!items.some(i=>sel.has(i.id)&&i.cloud&&i.state==="deleted");
+}
+function openItem(id){
+  const it=items.find(i=>i.id===id);if(!it)return;
+  const url=`/api/media/${id}?k=${K}`;
+  const canShow=["jpg","png","gif","webp","bmp","avif"].includes(it.ext);
+  const media=it.cloud&&!it.restored?`<div class="empty">Stored in the cloud account — save it or put it back to view.</div>`
+    :it.kind==="video"?`<video controls preload="metadata" src="${url}"></video>`
+    :canShow?`<img src="${url}" alt="">`:`<img src="/api/thumb/${id}?k=${K}" alt="" onerror="this.outerHTML='<div class=empty>No in-browser preview for .${esc(it.ext)} — save it to open.</div>'">`;
+  const q={verified:"Verified — the file structure is complete",intact:"Intact — structure parses from start to end",damaged:"Damaged — header found but part of the content was overwritten"}[it.quality]||it.quality;
+  $("lb").innerHTML=`${media}<dl>
+   <dt>Name</dt><dd>${esc(it.name||"(name not recoverable)")}</dd>
+   <dt>Verdict</dt><dd><b>${esc({deleted:"Deleted",existing:"Still existing",unsorted:"Unsorted"}[it.state])}</b></dd>
+   <dt>How it was found</dt><dd>${esc(it.origin_label)}</dd>
+   <dt>Condition</dt><dd>${esc(q)}</dd>
+   <dt>Original folder</dt><dd>${esc(it.path||"—")}</dd>
+   <dt>Taken</dt><dd>${esc(it.taken||"—")}</dd><dt>Modified</dt><dd>${esc(it.modified||"—")}</dd>
+   ${it.deleted_at?`<dt>Deleted</dt><dd>${esc(it.deleted_at)}</dd>`:""}
+   <dt>Size</dt><dd>${size(it.size)}${it.width?` · ${it.width}×${it.height}`:""}</dd>
+   <dt>Notes</dt><dd>${esc(it.note||"—")}</dd>
+   ${it.restored?`<dt>Saved to</dt><dd>${esc(it.restored)}</dd>`:""}</dl>
+   <div class="row" style="margin-top:14px"><button class="b" onclick="toggle(${id},true);closeModal()">Select</button><button class="g" onclick="closeModal()">Close</button></div>`;
+  $("lightbox").classList.add("on");
+}
+function closeModal(){document.querySelectorAll(".modal").forEach(m=>m.classList.remove("on"));$("lb").innerHTML="";}
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal();});
+async function restore(all){
+  $("res-err").textContent="";
+  try{
+    if(!all&&!sel.size)throw new Error("Select some items first, or use “Save everything in this view”.");
+    await api("restore",all?{filter:filt(),dest:$("dest").value}:{ids:[...sel],dest:$("dest").value});
+    $("res-err").innerHTML='<span style="color:var(--accent)">Saving… progress is shown under step 1.</span>';refresh();
+  }catch(e){$("res-err").textContent=e.message;}
+}
+async function restoreInPlace(){
+  const ids=items.filter(i=>sel.has(i.id)&&i.cloud).map(i=>i.id);
+  if(!confirm(`Put ${ids.length} item(s) back where they were in the cloud account?`))return;
+  try{await api("restore",{ids,in_place:true});refresh();}catch(e){$("res-err").textContent=e.message;}
+}
+
+// ---- path picker
+let pkTarget=null,pkFiles=false;
+async function pick(target,files){pkTarget=target;pkFiles=!!files;$("picker").classList.add("on");nav($(target).value&&!$(target).value.startsWith("\\\\.")?$(target).value:"");}
+async function nav(path){
+  let d;try{d=await api("browse?"+new URLSearchParams({path}));}catch(e){d=await api("browse?path=");}
+  if(d.error&&path){d=await api("browse?"+new URLSearchParams({path:d.parent||""}));}
+  $("pk-path").textContent=d.path||"Places";
+  $("pk-list").innerHTML=(d.path?`<div data-p="${esc(d.parent)}" data-d="1">⬑ up</div>`:"")+d.entries.filter(e=>e.dir||pkFiles).map(e=>`<div data-p="${esc(e.path)}" data-d="${e.dir?1:""}"><span>${e.dir?"📁":"📄"} ${esc(e.name)}</span><span class="note" style="margin:0">${e.dir?"":size(e.size)}</span></div>`).join("");
+  $("pk-list").querySelectorAll("div").forEach(el=>el.onclick=()=>{if(el.dataset.d)nav(el.dataset.p);else{$(pkTarget).value=el.dataset.p;closeModal();}});
+  $("pk-use").disabled=!d.path;$("pk-use").onclick=()=>{$(pkTarget).value=d.path;closeModal();};
+}
+
+// ---- recovery map
+let mapLoaded=false;
+async function loadMap(){
+  if(mapLoaded)return;mapLoaded=true;
+  const d=await api("map");
+  $("principles").innerHTML=d.principles.map(([t,b])=>`<div class="card"><h3>${esc(t)}</h3><p style="margin:0">${esc(b)}</p></div>`).join("");
+  const go={disk:"disk-path",folder:"dev-path",evidence:"ev-path"};
+  $("map").innerHTML=d.map.map(m=>`<div class="card"><h3>${esc(m.name)}</h3><span class="tag">odds: ${esc(m.chance)}</span>
+    <p style="margin-top:8px">${esc(m.how)}</p>${m.routes.map(r=>`<div class="route"><span style="flex:1">${esc(r.t)}</span>${r.auto?`<button class="g" onclick="jump('${r.do}')">${r.do.startsWith("cloud")?"Connect":"Scan"}</button>`:`<span class="tag">you, in the app</span>`}</div>`).join("")}
+    ${m.limits?`<div class="note"><b>Limits:</b> ${esc(m.limits)}</div>`:""}</div>`).join("");
+  window.jump=a=>{show("find");if(a.startsWith("cloud:")){$("cl-prov").value=a.slice(6);cloudHelp();$("cl-id").focus();}else $(go[a]).focus();};
+}
+</script>
+</body>
+</html>
