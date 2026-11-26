@@ -1,0 +1,5 @@
+# Helpers installed on first start. Rewind still runs without them.
+Pillow>=10
+pillow-heif>=0.16
+segno>=1.5
+telethon>=1.40      # Telegram account sign-in

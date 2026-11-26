@@ -1,0 +1,3 @@
+# Only if you need them (see README):
+iphone_backup_decrypt   # encrypted iPhone backups
+wa-crypt-tools          # encrypted WhatsApp databases, with your own 64-digit key

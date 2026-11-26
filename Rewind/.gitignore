@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+Rewind.app/
+*.zip
+*.apk
+*.keystore
+android-app/out/
+tools/mac-launcher/Rewind-universal
+node_modules/

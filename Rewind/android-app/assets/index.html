@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rewind</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><img src="/icon.png" alt=""><span>Rewind</span></div>
+  <button id="btn-rescan" class="chip-btn hidden">Scan again</button>
+</header>
+
+<main id="home" class="screen on">
+  <section class="hero">
+    <h1>Bring back deleted photos and videos</h1>
+    <p>Rewind searches this phone by itself: Android's trash (photos and videos you deleted in the last 30 days), compared with what is still in your gallery. Allow photo access once and it starts.</p>
+    <button id="btn-scan" class="big">Allow access and scan</button>
+    <p class="fine" id="scan-note"></p>
+  </section>
+
+  <section class="card">
+    <h2>Give Rewind access</h2>
+    <div class="perm" id="perm-media">
+      <div><b>Photos and videos</b><p>To list the phone's trash and compare with your gallery. Rewind only reads; nothing leaves the phone.</p></div>
+      <button class="pill" data-ask="media">Allow</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Connect to Rewind on your Mac</h2>
+    <p class="muted">For everything the phone can't reach by itself: iPhone backups, email, Google, Instagram, memory cards. On the Mac open Rewind › Phone › <i>Use on my phone</i>, then type the address it shows. It opens in your browser.</p>
+    <div class="row"><input id="mac" inputmode="url" placeholder="192.168.1.5:8766" autocomplete="off"><button id="btn-mac" class="pill solid">Connect</button></div>
+  </section>
+
+  <details class="card">
+    <summary>What this phone can and can't bring back</summary>
+    <ul>
+      <li><b>Can:</b> anything still in Android's trash (about 30 days), put straight back into your gallery. On Android 7 to 10 it also opens hidden trash folders, preview caches and chat folders.</li>
+      <li><b>Can't:</b> files that left every trash. Android encrypts each file and wipes freed space, so their bytes are gone for any app. Copies may still exist in your email, chats, backups and accounts: use Rewind on your Mac for those.</li>
+      <li><b>Left to your Mac:</b> from Android 11, apps can't open other apps' folders or hidden caches. Rewind on the Mac reads those over a USB cable instead, so this phone app never asks for access to all your files.</li>
+    </ul>
+  </details>
+</main>
+
+<main id="scanning" class="screen">
+  <div class="scanbox">
+    <div class="ring"></div>
+    <h2>Searching…</h2>
+    <p id="scan-msg">Starting</p>
+    <p class="muted" id="scan-count"></p>
+  </div>
+</main>
+
+<main id="results" class="screen">
+  <div class="summary" id="summary"></div>
+  <div class="seg main" id="sides">
+    <button data-side="deleted" class="on">Deleted</button>
+    <button data-side="here">Still here</button>
+  </div>
+  <div class="seg" id="filters">
+    <button data-f="all" class="on">All</button>
+    <button data-f="trash">In a bin</button>
+    <button data-f="recovered">Copies</button>
+    <button data-f="thumbnail">Previews</button>
+  </div>
+  <p class="muted small" id="side-note"></p>
+  <div id="grid" class="grid"></div>
+  <p id="empty" class="empty hidden"></p>
+</main>
+
+<div id="bar" class="bar hidden">
+  <button id="btn-selall" class="pill">Select all</button>
+  <span id="selcount"></span>
+  <button id="btn-restore" class="pill solid">Restore all</button>
+</div>
+
+<div id="viewer" class="viewer hidden">
+  <div class="vtop"><button id="v-close" class="pill">Close</button></div>
+  <div class="vmedia" id="v-media"></div>
+  <div class="vinfo" id="v-info"></div>
+</div>
+<div id="toast" class="toast hidden"></div>
+<script src="/app.js"></script>
+</body>
+</html>

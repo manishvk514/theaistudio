@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0f12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Rewind">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/static/icons/icon-180.png">
+<link rel="icon" href="/static/icons/icon-192.png">
+<title>Rewind · bring back deleted photos and videos</title>
+<link rel="stylesheet" href="/static/app.css">
+<script>window.REWIND_TOKEN = "__TOKEN__"; window.REWIND_REMOTE = __REMOTE__ === 1;</script>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="logo">⟲</span> Rewind <small>deleted photo &amp; video recovery</small></div>
+  <div class="row"><div id="chips" class="chips"></div><button id="btn-quit" class="ghost hidden" title="Close Rewind">Quit</button></div>
+</header>
+<nav class="tabs" id="nav">
+  <button data-page="home" class="on">Home</button>
+  <button data-page="results">Deleted &amp; still here</button>
+  <button data-page="phone" id="nav-phone">Phone</button>
+  <button data-page="advanced">Advanced <span id="busy" class="dot hidden"></span></button>
+  <button data-page="how">How it works</button>
+</nav>
+
+<main>
+  <section id="page-home" class="page on">
+    <div class="scanhero">
+      <button id="bigscan" class="bigscan" aria-label="Scan everything"><span class="ring"></span><span class="bs-label" id="bs-label">Scan</span></button>
+      <div class="sh-text">
+        <h1 id="sh-title">Finding your deleted photos and videos</h1>
+        <p id="sh-sub" class="muted">Rewind looks everywhere on this computer by itself: Photos' Recently Deleted, the Trash, hidden caches, iPhone backups, Time Machine, plugged-in cards, account exports in Downloads, and your connected accounts.</p>
+        <div class="bar hidden" id="sh-bar"><i></i></div>
+      </div>
+    </div>
+    <div id="fda" class="note warnbox hidden"></div>
+    <div id="signin" class="signin hidden"></div>
+    <div class="counters" id="counters">
+      <button class="counter del" data-goview="deleted"><b id="c-del">0</b><span>Deleted, found</span></button>
+      <button class="counter here" data-goview="present"><b id="c-here">0</b><span>Still here</span></button>
+      <button class="counter gone" data-goview="missing"><b id="c-gone">0</b><span>Known, can't recover</span></button>
+    </div>
+    <div class="restorebar" id="restorebar">
+      <button class="primary big" id="btn-restore-all" disabled>Restore all deleted</button>
+      <span class="muted small" id="restore-where"></span>
+    </div>
+    <div class="twocol">
+      <div>
+        <h3 class="sect">Places checked</h3>
+        <div id="places" class="places"><p class="muted small">Starting…</p></div>
+      </div>
+      <div>
+        <h3 class="sect">Accounts</h3>
+        <div id="accounts" class="accounts"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="page-advanced" class="page">
+    <div class="note">Rewind scans everything by itself from Home. Use these only to add something it can't reach on its own: a folder elsewhere, an encrypted iPhone backup (needs its password), a memory card image, an email account, or an Android phone over USB.</div>
+    <div id="libnote" class="note hidden"></div>
+    <div id="source-groups"></div>
+    <h3 class="sect" style="margin-top:30px">Activity</h3>
+    <div id="jobs"></div>
+  </section>
+
+  <section id="page-results" class="page">
+    <div class="filters">
+      <div class="seg" id="views">
+        <button data-view="deleted" class="on">Deleted</button>
+        <button data-view="present">Still here</button>
+        <button data-view="missing">Can't recover</button>
+        <button data-view="trash">In a bin</button>
+        <button data-view="recovered">Rebuilt</button>
+        <button data-view="thumbnail">Previews only</button>
+        <button data-view="duplicate">Duplicates</button>
+      </div>
+      <div class="row">
+        <select id="f-kind"><option value="">Photos &amp; videos</option><option value="image">Photos</option><option value="video">Videos</option></select>
+        <select id="f-source"><option value="">All sources</option></select>
+        <select id="f-sort"><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="biggest">Biggest first</option></select>
+        <span class="grow"></span>
+        <span id="selcount" class="muted"></span>
+        <button id="btn-save-sel" class="ghost">Save selected</button>
+        <button id="btn-save-all" class="primary">Restore all deleted</button>
+      </div>
+    </div>
+    <div id="viewnote" class="muted small"></div>
+    <div id="grid" class="grid"></div>
+    <div class="more"><button id="btn-more" class="ghost hidden">Load more</button></div>
+  </section>
+
+  <section id="page-phone" class="page"><div id="phone-body"></div></section>
+
+
+  <section id="page-how" class="page prose">
+    <h2>Why a deleted photo can still come back</h2>
+    <p>A photo is just bytes stored somewhere. "Delete" almost never destroys those bytes straight away.
+    It removes the <em>pointer</em> to them, or moves them to a bin, or leaves other copies untouched. Rewind looks
+    everywhere a copy or a trace can survive, then compares each one with your current library. Anything that
+    survives somewhere but is no longer in your library is shown as deleted.</p>
+    <ol>
+      <li><b>Bins:</b> Photos' Recently Deleted, Android's hidden <code>.trashed-</code> files, gallery bins, Drive/OneDrive Trash, computer Trash.</li>
+      <li><b>Other copies:</b> old phone backups, chat exports, email attachments, Takeout exports, copies on cards and drives, the other person in a chat.</li>
+      <li><b>Previews:</b> thumbnail caches on phones and computers, previews inside app databases, which often outlive the photo.</li>
+      <li><b>Raw leftovers:</b> on memory cards, USB sticks and older hard drives, the bytes stay in free space until overwritten.</li>
+    </ol>
+    <h3>Where nothing can bring a photo back</h3>
+    <p>When the bin's timer has run out on the service's servers; when a phone's internal storage freed the space
+    (phones encrypt every file and wipe freed blocks); when an SSD has trimmed the space; and when no other copy
+    ever existed. Rewind tells you honestly when that is the case, and lists what it knows existed so you can ask the
+    other person in a chat to resend it.</p>
+    <p class="muted">Rewind only reads. It never deletes or changes anything on your phone, card or accounts, except
+    when you press a "Restore in Google Drive / OneDrive" button on an item.</p>
+  </section>
+</main>
+
+<div id="pairing" class="pairing hidden"><div class="sheet">
+  <h3>Connect this phone to Rewind</h3>
+  <p class="muted">On your laptop, open Rewind › Phone › <b>Use on my phone</b>. Type the 6-digit code it shows, or scan its QR code with the camera.</p>
+  <input type="text" id="paircode" inputmode="numeric" maxlength="6" placeholder="123456" autocomplete="one-time-code">
+  <div class="row" style="margin-top:14px"><span class="grow"></span><button class="primary" id="pairgo">Connect</button></div>
+  <p class="muted small" id="pairmsg"></p></div></div>
+<div id="modal" class="modal hidden"><div class="sheet" id="sheet"></div></div>
+<div id="toast" class="toast hidden"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
