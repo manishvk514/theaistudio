@@ -22,7 +22,7 @@
 </header>
 <nav class="tabs" id="nav">
   <button data-page="home" class="on">Home</button>
-  <button data-page="results">Deleted &amp; still here</button>
+  <button data-page="results">Photos</button>
   <button data-page="phone" id="nav-phone">Phone</button>
   <button data-page="advanced">Advanced <span id="busy" class="dot hidden"></span></button>
   <button data-page="how">How it works</button>
@@ -70,29 +70,32 @@
   </section>
 
   <section id="page-results" class="page">
-    <div class="filters">
-      <div class="seg" id="views">
-        <button data-view="deleted" class="on">Deleted</button>
-        <button data-view="present">Still here</button>
-        <button data-view="missing">Can't recover</button>
-        <button data-view="trash">In a bin</button>
-        <button data-view="recovered">Rebuilt</button>
-        <button data-view="thumbnail">Previews only</button>
-        <button data-view="duplicate">Duplicates</button>
+    <div class="gal-head">
+      <div class="gal-title"><h2>Your photos &amp; videos</h2><span id="gal-total" class="muted"></span></div>
+      <div class="seg chips-seg" id="views">
+        <button data-view="all">All <i data-count="all"></i></button>
+        <button data-view="deleted" class="on">Deleted <i data-count="deleted"></i></button>
+        <button data-view="present">Still here <i data-count="present"></i></button>
+        <button data-view="trash">In a bin <i data-count="trash"></i></button>
+        <button data-view="recovered">Rebuilt <i data-count="recovered"></i></button>
+        <button data-view="thumbnail">Previews <i data-count="thumbnail"></i></button>
+        <button data-view="missing">Can't recover <i data-count="missing"></i></button>
       </div>
-      <div class="row">
-        <select id="f-kind"><option value="">Photos &amp; videos</option><option value="image">Photos</option><option value="video">Videos</option></select>
+      <div class="row gal-tools">
+        <div class="seg small-seg" id="kinds"><button data-kind="" class="on">All</button><button data-kind="image">Photos</button><button data-kind="video">Videos</button></div>
         <select id="f-source"><option value="">All sources</option></select>
         <select id="f-sort"><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="biggest">Biggest first</option></select>
         <span class="grow"></span>
-        <span id="selcount" class="muted"></span>
-        <button id="btn-save-sel" class="ghost">Save selected</button>
+        <button id="btn-slideshow" class="ghost" title="Play everything shown as a slideshow">▶ Slideshow</button>
         <button id="btn-save-all" class="primary">Restore all deleted</button>
       </div>
+      <select id="f-kind" hidden><option value=""></option><option value="image"></option><option value="video"></option></select>
     </div>
     <div id="viewnote" class="muted small"></div>
-    <div id="grid" class="grid"></div>
-    <div class="more"><button id="btn-more" class="ghost hidden">Load more</button></div>
+    <div id="grid" class="gallery"></div>
+    <div id="grid-end" class="more"><button id="btn-more" class="ghost hidden">Load more</button></div>
+    <div id="selbar" class="selbar hidden"><span id="selcount"></span><span class="grow"></span>
+      <button class="ghost" id="btn-sel-clear">Clear</button><button id="btn-sel-dl">Download</button><button class="primary" id="btn-save-sel">Restore selected</button></div>
   </section>
 
   <section id="page-phone" class="page"><div id="phone-body"></div></section>
@@ -126,6 +129,22 @@
   <input type="text" id="paircode" inputmode="numeric" maxlength="6" placeholder="123456" autocomplete="one-time-code">
   <div class="row" style="margin-top:14px"><span class="grow"></span><button class="primary" id="pairgo">Connect</button></div>
   <p class="muted small" id="pairmsg"></p></div></div>
+<div id="lightbox" class="lb hidden" aria-modal="true" role="dialog">
+  <div class="lb-top">
+    <span id="lb-count" class="lb-count"></span><span id="lb-name" class="lb-name"></span><span class="grow"></span>
+    <button class="lb-btn" id="lb-play" title="Slideshow (space)">▶</button>
+    <button class="lb-btn" id="lb-info" title="Details (i)">ⓘ</button>
+    <a class="lb-btn" id="lb-dl" title="Download" download>⤓</a>
+    <button class="lb-btn" id="lb-fs" title="Full screen (f)">⛶</button>
+    <button class="lb-btn" id="lb-close" title="Close (Esc)">✕</button>
+  </div>
+  <button class="lb-nav lb-prev" id="lb-prev" aria-label="Previous">‹</button>
+  <div class="lb-stage" id="lb-stage"></div>
+  <button class="lb-nav lb-next" id="lb-next" aria-label="Next">›</button>
+  <aside class="lb-panel hidden" id="lb-panel"></aside>
+  <div class="lb-bottom" id="lb-actions"></div>
+  <div class="lb-progress"><i id="lb-prog"></i></div>
+</div>
 <div id="modal" class="modal hidden"><div class="sheet" id="sheet"></div></div>
 <div id="toast" class="toast hidden"></div>
 <script src="/static/app.js"></script>

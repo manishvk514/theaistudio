@@ -4,7 +4,7 @@
 # ~/Library/Logs/Rewind/rewind.log, and any failure shows a dialog with the reason.
 RES="$(cd "$(dirname "$0")" && pwd)"
 APPDIR="$(cd "$RES/../.." && pwd)"
-VERSION="5.1"
+VERSION="5.2"
 SUP="$HOME/Library/Application Support/Rewind"
 LOGDIR="$HOME/Library/Logs/Rewind"
 LOG="$LOGDIR/rewind.log"

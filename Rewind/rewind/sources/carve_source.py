@@ -82,6 +82,31 @@ def _extract(view, size, dest):
             pos += len(b)
 
 
+def jpeg_cut_short(path):
+    """True when a JPEG's image data stops early. A decoder fills the missing part with one flat grey,
+    so the bottom rows come out perfectly uniform; real photos essentially never are. Catches photos
+    whose end was overwritten even when stray bytes happen to look like an end-of-image marker."""
+    try:
+        from PIL import Image, ImageStat
+        with Image.open(path) as im:
+            if im.format != "JPEG":
+                return False
+            im.draft("L", (max(1, im.width // 8), max(1, im.height // 8)))
+            g = im.convert("L")
+            w, h = g.size
+            if h < 16:
+                return False
+            band = g.crop((0, h - max(2, h // 12), w, h))
+            lo, hi = band.getextrema()
+            if hi - lo > 1:
+                return False
+            # only "cut short" if the rest of the picture is not flat too (a plain grey image is fine)
+            top = g.crop((0, 0, w, max(2, h // 3)))
+            return ImageStat.Stat(top).stddev[0] > 2
+    except Exception:
+        return False
+
+
 def forensic_scan(ctx, path):
     """1. read the file system's own records: files still there (= still here) and
     deleted ones, with their names, dates and exact layout, fragments included;
@@ -130,7 +155,8 @@ def forensic_scan(ctx, path):
                 found = probe(Source(dest), 0) if view is not None else None
                 where = "%s › %s/%s" % (tag, e.path.rstrip("/"), e.name)
                 if e.deleted:
-                    damaged = e.intact != "good" or (view is not None and found is None)
+                    damaged = e.intact != "good" or (view is not None and found is None) or \
+                        (found is not None and found.ext == "jpg" and jpeg_cut_short(dest))
                     iid = ctx.ingest_file(dest, "carved", location=where, name=e.name,
                                           taken=(found.taken if found and found.taken else None),
                                           damaged=damaged,
@@ -156,7 +182,7 @@ def forensic_scan(ctx, path):
                 continue          # already recovered above, with its name
             dest = os.path.join(out, "carved_%012x.%s" % (runs[0][0], hit.found.ext))
             _extract(RunSource(src, runs), hit.found.length, dest)
-            cut = hit.found.extra.get("truncated")
+            cut = hit.found.extra.get("truncated") or (hit.found.ext == "jpg" and jpeg_cut_short(dest))
             iid = ctx.ingest_file(dest, "carved", location="%s @ byte %d" % (tag, runs[0][0]),
                                   taken=hit.found.taken or None, damaged=bool(cut),
                                   evidence=("Only the first part survived; the rest was overwritten by newer data, "

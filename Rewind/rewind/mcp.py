@@ -100,7 +100,7 @@ TOOLS = [
                                             "http://localhost:53682)"}}, ["service"])},
     {"name": "rewind_where_to_look",
      "description": "Every route by which a deleted photo/video can still come back for a service or device "
-                    "(e.g. whatsapp, snapchat, google photos, iphone, android, onedrive, telegram, "
+                    "(e.g. whatsapp, snapchat, google photos, iphone, android, onedrive, telegram, terabox, "
                     "'permanently deleted'), with what Rewind does automatically and what only the user can do.",
      "inputSchema": _schema({"service": {"type": "string"}}), "annotations": {"readOnlyHint": True}},
 ]

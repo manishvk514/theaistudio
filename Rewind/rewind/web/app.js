@@ -37,6 +37,7 @@ function go(page) {
   $$("#nav button").forEach(b => b.classList.toggle("on", b.dataset.page === page));
   $$(".page").forEach(p => p.classList.toggle("on", p.id === "page-" + page));
   if (page === "results") loadItems(true);
+  if (page !== "results" && typeof LB !== "undefined" && LB.open) closeLightbox();
   if (page === "advanced" && !SOURCES.length) loadSources().catch(() => {});
 }
 
@@ -126,73 +127,238 @@ async function refreshSummary() {
   sel.innerHTML = `<option value="">All sources</option>` + (s.sources || []).map(x => `<option ${x === cur ? "selected" : ""}>${esc(x)}</option>`).join("");
 }
 
-// ------------------------------------------------------------------ results
+// ------------------------------------------------------------------ gallery (results)
+const STATUS = {trash: ["In a bin", "s-bin"], recovered: ["Rebuilt", "s-rebuilt"], thumbnail: ["Preview only", "s-preview"],
+  missing: ["Can't recover", "s-gone"], present: ["Still here", "s-here"], duplicate: ["Copy", "s-here"]};
+function statusOf(it) { return STATUS[it.category] || STATUS[it.verdict] || [it.verdict || "", "s-here"]; }
+state.items = []; state.total = 0; state.kind = ""; state.loading = false; state.lastMonth = null;
+
 $$("#views button").forEach(b => b.onclick = () => { $$("#views button").forEach(x => x.classList.toggle("on", x === b)); state.view = b.dataset.view; loadItems(true); });
-["#f-kind", "#f-source", "#f-sort"].forEach(s => $(s).onchange = () => loadItems(true));
+$$("#kinds button").forEach(b => b.onclick = () => { $$("#kinds button").forEach(x => x.classList.toggle("on", x === b)); state.kind = b.dataset.kind; $("#f-kind").value = state.kind; loadItems(true); });
+["#f-source", "#f-sort"].forEach(s => $(s).onchange = () => loadItems(true));
 $("#btn-more").onclick = () => loadItems(false);
+if ("IntersectionObserver" in window) new IntersectionObserver(es => { if (es.some(e => e.isIntersecting) && $("#page-results").classList.contains("on") && state.offset < state.total) loadItems(false); },
+  {rootMargin: "800px"}).observe($("#grid-end"));
+
+async function refreshCounts() {
+  try {
+    const s = await api("/api/summary");
+    const c = {all: (s.n_present || 0) + (s.n_deleted || 0), deleted: s.n_deleted || 0, present: s.n_present || 0,
+      trash: s.trash || 0, recovered: s.recovered || 0, thumbnail: s.thumbnail || 0, missing: s.n_missing || 0};
+    $$("[data-count]").forEach(i => { i.textContent = c[i.dataset.count] ? c[i.dataset.count].toLocaleString() : ""; });
+  } catch (e) { /* ignore */ }
+}
+
+function monthOf(it) {
+  const d = (it.taken || it.deleted_at || "").slice(0, 7);
+  if (!/^\d{4}-\d\d$/.test(d)) return "Date unknown";
+  return new Date(d + "-01T12:00:00").toLocaleDateString(undefined, {month: "long", year: "numeric"});
+}
 
 async function loadItems(reset) {
-  if (reset) { state.offset = 0; $("#grid").innerHTML = ""; }
-  $("#viewnote").textContent = VIEWNOTE[state.view] || "";
-  const q = new URLSearchParams({view: state.view, kind: $("#f-kind").value, source: $("#f-source").value, sort: $("#f-sort").value, offset: state.offset, limit: 120});
-  const r = await api("/api/items?" + q);
-  state.offset += r.items.length;
-  $("#grid").insertAdjacentHTML("beforeend", r.items.map(tileHTML).join(""));
-  $("#btn-more").classList.toggle("hidden", state.offset >= r.total);
-  if (!r.total && reset) $("#grid").innerHTML = `<p class="muted">Nothing here yet. Add places to search on the first tab.</p>`;
-  if (reset && state.view === "missing" && r.total) {
-    const a = await api("/api/ask");
-    if ($("#asknote")) $("#asknote").remove();
-    if (a.text) $("#grid").insertAdjacentHTML("beforebegin", `<div class="note" id="asknote"><b>These were in chats.</b> The other person usually still has them. <button id="askcopy" class="ghost">Copy messages asking for them</button></div>`);
-    if ($("#askcopy")) $("#askcopy").onclick = () => { navigator.clipboard.writeText(a.text); toast("Copied. Paste it into each chat."); };
-  } else if (reset && $("#asknote")) $("#asknote").remove();
-  $$(".tile:not([data-wired])").forEach(wireTile);
-  updateSel();
+  if (state.loading && !reset) return;
+  state.loading = true;
+  const view = state.view, kind = state.kind;
+  if (reset) { state.offset = 0; state.items = []; state.lastMonth = null; $("#grid").innerHTML = `<div class="gal-skel">${"<i></i>".repeat(18)}</div>`; refreshCounts(); }
+  $("#viewnote").textContent = VIEWNOTE[view] || (view === "all" ? "Everything Rewind found: what you still have and every deleted photo or video that came back." : "");
+  try {
+    const q = new URLSearchParams({view, kind, source: $("#f-source").value, sort: $("#f-sort").value, offset: state.offset, limit: 120});
+    const r = await api("/api/items?" + q);
+    if (view !== state.view || kind !== state.kind) return;           // the filter changed while loading
+    if (reset) $("#grid").innerHTML = "";
+    const byDate = $("#f-sort").value !== "biggest";
+    let html = "";
+    r.items.forEach((it, k) => {
+      const m = monthOf(it);
+      if (byDate && m !== state.lastMonth) { html += `<h4 class="gal-month">${esc(m)}</h4>`; state.lastMonth = m; }
+      html += tileHTML(it, state.items.length + k);
+    });
+    state.items.push(...r.items);
+    state.offset += r.items.length; state.total = r.total;
+    $("#grid").insertAdjacentHTML("beforeend", html);
+    $("#gal-total").textContent = r.total ? `${r.total.toLocaleString()} item${r.total === 1 ? "" : "s"}` : "";
+    $("#btn-more").classList.toggle("hidden", state.offset >= r.total);
+    $("#btn-slideshow").disabled = !state.items.some(it => it.has_file);
+    if (!r.total && reset) $("#grid").innerHTML = `<div class="gal-empty"><div class="big">⟲</div><h3>Nothing here yet</h3><p class="muted">${
+      view === "present" ? "Your current library appears here once Rewind has read it." : "Run a scan from Home, connect an account, or upload an export, and what comes back shows up here."}</p></div>`;
+    if (reset && view === "missing" && r.total) {
+      const a = await api("/api/ask");
+      if (a.text) $("#grid").insertAdjacentHTML("afterbegin", `<div class="note" id="asknote" style="grid-column:1/-1"><b>These were in chats.</b> The other person usually still has them. <button id="askcopy" class="ghost">Copy messages asking for them</button></div>`);
+      if ($("#askcopy")) $("#askcopy").onclick = () => { navigator.clipboard.writeText(a.text); toast("Copied. Paste it into each chat."); };
+    }
+    $$(".tile:not([data-wired])").forEach(wireTile);
+    updateSel();
+    if (LB.open) lbRender();
+  } catch (e) { toast(e.message); } finally { state.loading = false; }
 }
-function tileHTML(it) {
-  const cat = it.category || it.verdict || "";
-  const img = it.has_file ? `style="background-image:url('/api/thumb/${it.id}?t=${T}')"` : "";
-  const when = (it.taken || it.deleted_at || "").slice(0, 10) || "date unknown";
-  return `<div class="tile ${state.sel.has(it.id) ? "sel" : ""}" data-id="${it.id}">
-    <div class="img" ${img}>${it.has_file ? "" : esc(it.name || "") + "<br>(no file left)"}</div>
-    <span class="badge b-${esc(cat)}">${esc(LABEL[cat] || cat)}</span>${it.has_file && ["deleted"].includes(it.verdict) ? `<span class="chk"></span>` : ""}
-    ${it.kind === "video" ? `<span class="vid">▶ video</span>` : ""}
-    <div class="meta"><div class="n">${esc(it.name || "unnamed")}</div><div class="muted">${esc(when)} · ${esc(it.source)}${it.copies > 1 ? ` · ${it.copies} copies` : ""}</div></div></div>`;
+
+function tileHTML(it, i) {
+  const [label, cls] = statusOf(it);
+  const media = it.has_file ? `<img loading="lazy" decoding="async" src="/api/thumb/${it.id}?t=${T}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph',textContent:'${it.kind === "video" ? "▶" : "🖼"}'}))">`
+    : `<div class="ph"><span>${it.kind === "video" ? "▶" : "🖼"}</span><small>${esc(it.name || "")}</small><small>${it.verdict === "missing" ? "no copy left" : "in your account"}</small></div>`;
+  return `<div class="tile ${state.sel.has(it.id) ? "sel" : ""}" data-id="${it.id}" data-i="${i}" tabindex="0">
+    ${media}<span class="pill ${cls}">${esc(label)}</span>
+    ${it.kind === "video" ? `<span class="vbadge">▶</span>` : ""}${it.restored_to ? `<span class="done-badge" title="Restored">✓</span>` : ""}
+    ${it.has_file ? `<button class="chk" aria-label="Select"></button>` : ""}
+    <div class="cap"><b>${esc(it.name || "Unnamed")}</b><span>${esc((it.taken || it.deleted_at || "").slice(0, 10) || "date unknown")} · ${esc(it.source || "")}${it.copies > 1 ? ` · ${it.copies} copies` : ""}</span></div></div>`;
 }
 function wireTile(el) {
   el.dataset.wired = 1;
   const id = +el.dataset.id;
   el.onclick = e => {
-    if (e.target.classList.contains("chk")) { state.sel.has(id) ? state.sel.delete(id) : state.sel.add(id); el.classList.toggle("sel"); updateSel(); return; }
-    openItem(id);
+    if (e.target.classList.contains("chk")) { e.stopPropagation(); toggleSel(id, el); return; }
+    if (state.sel.size && !e.target.closest(".cap")) { toggleSel(id, el); return; }
+    openLightbox(+el.dataset.i);
   };
+  el.onkeydown = e => { if (e.key === "Enter") openLightbox(+el.dataset.i); };
 }
-function updateSel() { $("#selcount").textContent = state.sel.size ? state.sel.size + " selected" : ""; $("#btn-save-sel").disabled = !state.sel.size; }
+function toggleSel(id, el) {
+  state.sel.has(id) ? state.sel.delete(id) : state.sel.add(id);
+  (el || $(`.tile[data-id="${id}"]`))?.classList.toggle("sel", state.sel.has(id));
+  updateSel();
+}
+function updateSel() {
+  const n = state.sel.size;
+  $("#selcount").textContent = n ? `${n} selected` : "";
+  $("#selbar").classList.toggle("hidden", !n);
+  $("#btn-save-sel").disabled = !n;
+}
+$("#btn-sel-clear").onclick = () => { state.sel.clear(); $$(".tile.sel").forEach(t => t.classList.remove("sel")); updateSel(); };
+$("#btn-sel-dl").onclick = () => saveZip([...state.sel]);
 
-async function openItem(id) {
-  const one = await api("/api/item/" + id).catch(() => null);
-  if (!one) return;
-  let copies = [];
-  if (one.group_id) copies = (await api("/api/items?" + new URLSearchParams({view: "group", group: one.group_id}))).items;
-  const big = one.has_file ? (one.kind === "video" ? `<video controls src="/api/file/${id}?t=${T}"></video>` :
-    `<img src="/api/thumb/${id}?t=${T}" onerror="this.replaceWith(document.createTextNode('No preview available'))">`) : `<p class="muted">No file survived.</p>`;
-  const remote = one.remote ? JSON.parse(one.remote) : null;
-  const rbtn = remote ? `<button class="primary" id="rr">${remote.service === "gdrive" ? "Put back in Google Drive" : "Restore in OneDrive"}</button>` : "";
-  $("#sheet").innerHTML = `<div class="detail"><div>${big}</div><div><h3>${esc(one.name || "Unnamed")}</h3>
-    <div class="kv"><div><b>Status</b> ${esc(LABEL[one.category] || one.verdict)}${one.damaged ? " (damaged: part of the file was overwritten)" : ""}</div>
-    <div><b>Why</b> ${esc(one.evidence || "")}</div><div><b>Found at</b> ${esc(one.location)}</div>
-    <div><b>Taken</b> ${esc(one.taken || "unknown")}</div>${one.deleted_at ? `<div><b>Deleted</b> ${esc(one.deleted_at)}</div>` : ""}
-    <div><b>Size</b> ${one.width ? one.width + "×" + one.height + " · " : ""}${one.size ? (one.size / 1048576).toFixed(2) + " MB" : "?"}</div>
-    ${one.restored_to ? `<div><b>Restored</b> ${esc(one.restored_to)}</div>` : ""}</div>
-    ${copies.length > 1 ? `<p class="muted small">${copies.length} copies of this picture were found:</p><ul class="small">${copies.map(c => `<li>${esc(LABEL[c.category] || c.category)} · ${esc(c.location)}</li>`).join("")}</ul>` : ""}
-    <div class="row" style="margin-top:14px">${rbtn}${one.has_file ? `<a href="/api/file/${id}?t=${T}&dl=1" download><button>Download</button></a>` : ""}${one.has_file && one.verdict === "deleted" ? `<button id="save1">Save this one</button>` : ""}<button class="ghost" id="close">Close</button></div></div></div>`;
-  $("#modal").classList.remove("hidden");
-  $("#close").onclick = closeModal;
-  if ($("#save1")) $("#save1").onclick = () => restoreAll([id]);
-  if ($("#rr")) $("#rr").onclick = async () => {
-    if (!confirm("This changes your " + (remote.service === "gdrive" ? "Google Drive" : "OneDrive") + ": the item leaves the bin and goes back into your files. Continue?")) return;
-    try { const m = await api("/api/remote_restore", {id}); toast(m.message); closeModal(); refreshSummary(); } catch (e) { toast(e.message); }
+// ------------------------------------------------------------------ full-screen viewer
+const LB = {open: false, i: 0, playing: false, timer: null, info: false};
+async function openLightbox(i) {
+  LB.open = true; LB.i = i;
+  $("#lightbox").classList.remove("hidden"); document.body.classList.add("noscroll");
+  lbRender();
+}
+function closeLightbox() {
+  lbStop(); LB.open = false;
+  const v = $("#lb-stage video"); if (v) v.pause();
+  $("#lightbox").classList.add("hidden"); document.body.classList.remove("noscroll");
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  const t = $(`.tile[data-i="${LB.i}"]`); if (t && t.scrollIntoView) t.scrollIntoView({block: "nearest"});
+}
+function lbGo(d) {
+  const n = state.items.length; if (!n) return;
+  LB.i = (LB.i + d + n) % n;
+  if (LB.i >= n - 10 && state.offset < state.total) loadItems(false);
+  lbRender();
+}
+function lbRender() {
+  const it = state.items[LB.i]; if (!it) return;
+  const [label, cls] = statusOf(it);
+  $("#lb-count").textContent = `${LB.i + 1} / ${state.total.toLocaleString()}`;
+  $("#lb-name").textContent = it.name || "Unnamed";
+  const dl = $("#lb-dl"); dl.classList.toggle("hidden", !it.has_file); dl.href = `/api/file/${it.id}?t=${T}&dl=1`;
+  const st = $("#lb-stage");
+  if (st.dataset.id != it.id) {
+    st.dataset.id = it.id;
+    if (!it.has_file) st.innerHTML = `<div class="lb-none"><div class="big">${it.kind === "video" ? "▶" : "🖼"}</div><h3>${esc(it.name || "")}</h3><p>${esc(it.evidence || "No copy of this one survives.")}</p></div>`;
+    else if (it.kind === "video") {
+      st.innerHTML = `<video src="/api/view/${it.id}?t=${T}" controls autoplay playsinline poster="/api/thumb/${it.id}?t=${T}"></video>`;
+      const v = $("video", st);
+      v.onended = () => { if (LB.playing) lbGo(1); };
+      v.onerror = () => { st.insertAdjacentHTML("beforeend", `<p class="lb-warn">This browser can't play this video format. Download it to watch.</p>`); };
+    } else {
+      st.innerHTML = `<img class="lb-img" alt="" src="/api/thumb/${it.id}?t=${T}"><span class="lb-spin"></span>`;
+      const full = new Image();
+      full.onload = () => { if (st.dataset.id == it.id) { const img = $(".lb-img", st); img.src = full.src; $(".lb-spin", st)?.remove(); } };
+      full.onerror = () => $(".lb-spin", st)?.remove();
+      full.src = `/api/view/${it.id}?t=${T}`;
+      $(".lb-img", st).ondblclick = zoomAt;
+    }
+    [1, -1].forEach(d => { const nb = state.items[(LB.i + d + state.items.length) % state.items.length];
+      if (nb && nb.has_file && nb.kind === "image") new Image().src = `/api/view/${nb.id}?t=${T}`; });
+  }
+  const remote = it.remote ? JSON.parse(it.remote) : null;
+  const svc = remote && {gdrive: "Google Drive", onedrive: "OneDrive", dropbox: "Dropbox"}[remote.service];
+  $("#lb-actions").innerHTML = `<span class="pill ${cls}">${esc(label)}</span><span class="lb-why">${esc(it.evidence || "")}</span><span class="grow"></span>
+    ${it.has_file ? `<button class="lb-pill-btn ${state.sel.has(it.id) ? "on" : ""}" id="lb-sel">${state.sel.has(it.id) ? "✓ Selected" : "Select"}</button>` : ""}
+    ${svc ? `<button class="lb-pill-btn" id="lb-remote">Put back in ${svc}</button>` : ""}
+    ${it.has_file && it.verdict === "deleted" ? `<button class="primary" id="lb-restore">${it.restored_to ? "Restore again" : "Restore"}</button>` : ""}`;
+  if ($("#lb-sel")) $("#lb-sel").onclick = () => { toggleSel(it.id); lbRender(); };
+  if ($("#lb-restore")) $("#lb-restore").onclick = () => { lbStop(); restoreAll([it.id]); };
+  if ($("#lb-remote")) $("#lb-remote").onclick = async () => {
+    if (!confirm(`Put this back in your ${svc}? It leaves the bin and returns to your files.`)) return;
+    try { const m = await api("/api/remote_restore", {id: it.id}); toast(m.message); it.restored_to = m.message; } catch (e) { toast(e.message); }
   };
+  if (LB.info) lbInfo(it);
+  $("#lb-panel").classList.toggle("hidden", !LB.info);
+  $("#lb-play").textContent = LB.playing ? "❚❚" : "▶";
+}
+async function lbInfo(it) {
+  const p = $("#lb-panel");
+  p.innerHTML = `<h3>${esc(it.name || "Unnamed")}</h3><div class="kv"><div><b>Status</b>${esc(statusOf(it)[0])}${it.damaged ? " · part of it was overwritten" : ""}</div>
+    <div><b>Why</b>${esc(it.evidence || "")}</div><div><b>Found at</b>${esc(it.location || "")}</div>
+    <div><b>Taken</b>${esc(it.taken || "unknown")}</div>${it.deleted_at ? `<div><b>Deleted</b>${esc(it.deleted_at)}</div>` : ""}
+    <div><b>Size</b>${it.width ? it.width + " × " + it.height + " · " : ""}${it.size ? (it.size / 1048576).toFixed(2) + " MB" : "?"}</div>
+    ${it.restored_to ? `<div><b>Restored</b>${esc(it.restored_to)}</div>` : ""}</div><div id="lb-copies"></div>`;
+  if (it.group_id && it.copies > 1) {
+    const g = await api("/api/items?" + new URLSearchParams({view: "group", group: it.group_id})).catch(() => null);
+    if (g && $("#lb-copies")) $("#lb-copies").innerHTML = `<p class="muted small">${g.items.length} copies were found:</p><ul class="small">${g.items.map(c => `<li>${esc(statusOf(c)[0])} · ${esc(c.location)}</li>`).join("")}</ul>`;
+  }
+}
+function zoomAt(e) {
+  const img = e.currentTarget, st = $("#lb-stage");
+  if (img.classList.toggle("zoomed")) {
+    const r = img.getBoundingClientRect(), fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+    requestAnimationFrame(() => { st.scrollLeft = fx * img.scrollWidth - st.clientWidth / 2; st.scrollTop = fy * img.scrollHeight - st.clientHeight / 2; });
+  }
+  st.classList.toggle("zooming", img.classList.contains("zoomed"));
+}
+function lbPlay() {
+  LB.playing = true; $("#lb-play").textContent = "❚❚";
+  const tick = () => {
+    clearTimeout(LB.timer);
+    const it = state.items[LB.i];
+    const prog = $("#lb-prog"); prog.style.transition = "none"; prog.style.width = "0";
+    if (it && it.kind === "video" && it.has_file) { LB.timer = setTimeout(() => { if (LB.playing) { lbGo(1); tick(); } }, 120000); return; }
+    requestAnimationFrame(() => { prog.style.transition = "width 4s linear"; prog.style.width = "100%"; });
+    LB.timer = setTimeout(() => { if (LB.playing) { lbGo(1); tick(); } }, 4000);
+  };
+  LB.tick = tick; tick();
+}
+function lbStop() { LB.playing = false; clearTimeout(LB.timer); const p = $("#lb-prog"); if (p) { p.style.transition = "none"; p.style.width = "0"; } if ($("#lb-play")) $("#lb-play").textContent = "▶"; }
+$("#lb-prev").onclick = () => { lbGo(-1); if (LB.playing) LB.tick(); };
+$("#lb-next").onclick = () => { lbGo(1); if (LB.playing) LB.tick(); };
+$("#lb-close").onclick = closeLightbox;
+$("#lb-play").onclick = () => LB.playing ? lbStop() : lbPlay();
+$("#lb-info").onclick = () => { LB.info = !LB.info; lbRender(); };
+$("#lb-fs").onclick = () => document.fullscreenElement ? document.exitFullscreen() : $("#lightbox").requestFullscreen?.().catch(() => {});
+$("#lb-stage").onclick = e => { if (e.target.id === "lb-stage") closeLightbox(); };
+document.addEventListener("keydown", e => {
+  if (!LB.open || e.target.matches("input,textarea")) return;
+  if (e.key === "ArrowRight") { lbGo(1); if (LB.playing) LB.tick(); }
+  else if (e.key === "ArrowLeft") { lbGo(-1); if (LB.playing) LB.tick(); }
+  else if (e.key === "Escape") closeLightbox();
+  else if (e.key === " ") { e.preventDefault(); LB.playing ? lbStop() : lbPlay(); }
+  else if (e.key === "i") $("#lb-info").click();
+  else if (e.key === "f") $("#lb-fs").click();
+});
+(() => {  // swipe on phones and trackpads
+  let x0 = null, y0 = null;
+  const lb = $("#lightbox");
+  lb.addEventListener("touchstart", e => { if (e.touches.length === 1) { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; } }, {passive: true});
+  lb.addEventListener("touchend", e => {
+    if (x0 === null || $(".lb-img.zoomed")) return;
+    const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0; x0 = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) { lbGo(dx < 0 ? 1 : -1); if (LB.playing) LB.tick(); }
+    else if (dy > 90 && Math.abs(dy) > Math.abs(dx)) closeLightbox();
+  }, {passive: true});
+})();
+$("#btn-slideshow").onclick = () => {
+  const first = state.items.findIndex(it => it.has_file);
+  if (first < 0) return toast("Nothing to show yet.");
+  openLightbox(first); lbPlay();
+};
+// kept for anything that still calls it (older pages, tests)
+async function openItem(id) {
+  const i = state.items.findIndex(it => it.id === id);
+  if (i >= 0) return openLightbox(i);
+  const one = await api("/api/item/" + id).catch(() => null);
+  if (one) { state.items.push(one); openLightbox(state.items.length - 1); }
 }
 
 $("#btn-save-all").onclick = () => restoreAll(null);
@@ -378,7 +544,7 @@ function renderAccounts() {
     ${tg.state === "need_qr" && tg.qr_svg ? `<div class="tgqr">${tg.qr_svg}</div>${/Android|iPhone|iPad/.test(navigator.userAgent) ? `<p class="small">On this phone? <a href="${esc(tg.qr_url)}" style="color:var(--accent)">Open in Telegram</a> instead.</p>` : ""}
       <p class="small muted"><a href="#" id="tg-phone" style="color:var(--accent)">Use my phone number instead</a></p>` : ""}
     ${tg.state === "need_app" || tg.state === "need_password" || tg.state === "need_code" || (tgForm && tg.state !== "connected") ? tgFormHTML(tg) : ""}</div>`;
-  html += snapCard();
+  html += snapCard() + teraCard();
   html += INFO_CARDS.map(c => `<div class="acct info"><h4>${esc(c.t)}</h4><p>${esc(c.p)}</p><p>${c.links.map(([n, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(n)} ↗</a>`).join(" · ")}</p></div>`).join("");
   if (document.activeElement && el.contains(document.activeElement)) return; // don't wipe a field being typed in
   el.innerHTML = html;
@@ -412,6 +578,10 @@ function claudeCard() {
   if (REMOTE || (typeof DISCOVER !== "undefined" && DISCOVER && DISCOVER.android_local)) return "";
   return `<div class="acct"><div class="row"><h4>Use with Claude</h4><span class="grow"></span><button class="primary" id="claude-add">Add to Claude</button></div>
     <p id="claude-msg">Adds Rewind to Claude Desktop and Claude Code on this computer, so you can ask Claude to scan, show and restore. Reopen Claude Desktop afterwards.</p></div>`;
+}
+function teraCard() {
+  return `<div class="acct"><div class="row"><h4>TeraBox</h4><span class="grow"></span><a href="https://www.terabox.com/" target="_blank" rel="noopener"><button>Open TeraBox ↗</button></a></div>
+    <p>TeraBox lets no outside app read its Recycle Bin. Open TeraBox › <b>Recycle Bin</b>, select your photos and videos and press <b>Restore</b> (TeraBox keeps them for a limited time). Then download the folder and ${CLOUD ? "upload it on the Upload tab" : "leave it in Downloads"}: Rewind sorts what was deleted from what you still have.</p></div>`;
 }
 function snapCard() {
   const how = CLOUD ? `<label class="upload small-upload"><input type="file" id="snap-up" accept=".zip" multiple hidden><span class="primary-btn">Upload the Snapchat zip</span></label><div id="snap-list" class="small"></div>`

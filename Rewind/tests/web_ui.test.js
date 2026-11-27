@@ -55,10 +55,20 @@ async function until(fn, ms = 30000) { const t = Date.now(); while (Date.now() -
   ok("'Still here' counter opens the still-here list", $("#page-results").classList.contains("on") && $$(".tile").length >= 2);
   $('#views button[data-view="deleted"]').click(); await sleep(1500);
   ok("deleted list shows tiles (" + $$(".tile").length + ")", $$(".tile").length >= 3);
+  $('#views button[data-view="all"]').click(); await sleep(1500);
+  ok("'All' shows deleted and still-here together, grouped by month",
+     $$(".tile").length >= 5 && $$(".gal-month").length >= 1 && /\d/.test($('[data-count="all"]').textContent));
+  $('#views button[data-view="deleted"]').click(); await sleep(1500);
   $(".tile").click(); await sleep(800);
-  ok("an item shows why it counts as deleted and a Download button",
-     $("#sheet").textContent.includes("Why") && $("#sheet").textContent.includes("Download"));
-  $("#close").click();
+  ok("tapping a photo opens the full-screen viewer with its status and why",
+     !$("#lightbox").classList.contains("hidden") && /1 \/ \d+/.test($("#lb-count").textContent) && $("#lb-actions").textContent.length > 10);
+  ok("the viewer offers Download and Restore", !$("#lb-dl").classList.contains("hidden") && !!$("#lb-restore"));
+  $("#lb-next").click(); await sleep(300);
+  ok("next goes to the following item", /^2 \//.test($("#lb-count").textContent));
+  $("#lb-info").click(); await sleep(300);
+  ok("the details panel explains where it was found", $("#lb-panel").textContent.includes("Found at"));
+  $("#lb-close").click();
+  ok("closing returns to the gallery", $("#lightbox").classList.contains("hidden"));
 
   $('#nav button[data-page="advanced"]').click(); await sleep(1500);
   ok("Advanced keeps the manual sources", $$(".card").length >= 12 && !$('.card[data-id="auto"]') && !$('.card[data-id="card-deep"]'));

@@ -143,6 +143,20 @@ MAP = [
          {"t": "Chat media saved in chat by either person stays until unsaved", "do": "manual"},
      ],
      "limits": "A snap that was opened and never saved leaves no server copy. Only a device cache remnant can exist."},
+    {"id": "terabox", "name": "TeraBox", "chance": "high while it is in TeraBox's Recycle Bin, otherwise only via copies",
+     "how": "Delete = moved to TeraBox's Recycle Bin, then erased when its timer runs out (reported as about 10 days on free "
+            "accounts and 30 on Premium [Unverified: third-party guides, not TeraBox]). TeraBox offers outside apps no official "
+            "access to the Recycle Bin.",
+     "routes": [
+         {"t": "TeraBox app or terabox.com > Recycle Bin: select the photos and videos > Restore. Do this first: it is the only "
+               "way back for anything still in the bin", "do": "manual"},
+         {"t": "After restoring, download the folder from TeraBox (or let it sync) and give it to Rewind, which sorts deleted "
+               "from still here", "do": "evidence", "auto": True},
+         {"t": "Phone that uploaded to TeraBox: its camera folder, gallery trash and thumbnails often still hold the original",
+          "do": "folder", "auto": True},
+         {"t": "Files you shared from TeraBox: whoever received the share link may still have downloaded copies", "do": "manual"},
+     ],
+     "limits": "Once TeraBox empties its Recycle Bin, the files are gone from TeraBox's servers; only copies elsewhere remain."},
     {"id": "icloud", "name": "iCloud Photos", "chance": "high within 30 days",
      "how": "Delete = Recently Deleted for 30 days on every synced device, then purged.",
      "routes": [
@@ -160,7 +174,7 @@ ALIASES = {
     "ios": "iphone", "ipad": "iphone", "apple": "icloud", "icloud photos": "icloud", "wa": "whatsapp",
     "snap": "snapchat", "tg": "telegram", "permanent": "gone", "permanently deleted": "gone",
     "not in bin": "gone", "everything": "gone", "realme": "android", "samsung": "android",
-    "instagram": "gone", "facebook": "gone",
+    "instagram": "gone", "facebook": "gone", "tera box": "terabox", "terabox cloud": "terabox",
 }
 
 

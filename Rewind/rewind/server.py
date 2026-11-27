@@ -146,7 +146,9 @@ class App:
         view = q.get("view", "deleted")
         con = self.cat.con()
         where, args = [], []
-        if view == "deleted":
+        if view == "all":       # everything you can look at: what you still have and what came back
+            where.append("((verdict='deleted' AND is_primary=1) OR verdict='present')")
+        elif view == "deleted":
             where.append("verdict='deleted' AND is_primary=1")
         elif view in ("trash", "recovered", "thumbnail"):
             where.append("verdict='deleted' AND is_primary=1 AND category=?")
@@ -191,11 +193,26 @@ class App:
         tp = os.path.join(tdir, "%d.jpg" % item_id)
         if os.path.exists(tp):
             return tp, "image/jpeg"
-        if imaging.make_thumb(it["path"], it["kind"], tp):
+        if imaging.make_thumb(it["path"], it["kind"], tp, size=480):
             return tp, "image/jpeg"
         if it["kind"] == "image" and it["ext"] in BROWSER_OK:
             return it["path"], mimetypes.guess_type("x" + it["ext"])[0] or "image/jpeg"
         return None, None
+
+    def view(self, item_id):
+        """A full-screen picture: the original when browsers can show it, else a 2048 px JPEG."""
+        it = self.cat.get(item_id)
+        if not it or not it["path"] or not os.path.exists(it["path"]):
+            return None, None
+        if it["kind"] == "video" or (it["ext"] or "").lower() in (".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"):
+            ct = mimetypes.guess_type("x" + (it["ext"] or ""))[0] or ("video/mp4" if it["kind"] == "video" else "image/jpeg")
+            if it["kind"] == "video" and (it["ext"] or "").lower() == ".mov":
+                ct = "video/mp4"        # most .mov from phones are H.264/HEVC in MP4-compatible containers
+            return it["path"], ct
+        vp = os.path.join(self.cat.dir("views"), "%d.jpg" % item_id)
+        if os.path.exists(vp) or imaging.make_thumb(it["path"], it["kind"], vp, size=2048):
+            return vp, "image/jpeg"
+        return self.thumb(item_id)
 
     def remote_restore(self, item_id):
         it = self.cat.get(item_id)
@@ -362,15 +379,48 @@ def make_handler(app, remote=False):
             self.wfile.write(body)
 
         def _file(self, path, ctype, download_name=None):
+            """Serve a file; honours Range so videos can stream and seek (Safari needs it)."""
             size = os.path.getsize(path)
-            self.send_response(200)
+            start, end = 0, size - 1
+            rng = self.headers.get("Range", "")
+            m = re.match(r"bytes=(\d*)-(\d*)$", rng.strip())
+            partial = bool(m and (m.group(1) or m.group(2)) and size)
+            if partial:
+                if m.group(1):
+                    start = int(m.group(1))
+                    end = min(int(m.group(2)), size - 1) if m.group(2) else size - 1
+                else:
+                    start = max(0, size - int(m.group(2)))
+                if start > end or start >= size:
+                    self.send_response(416)
+                    self.send_header("Content-Range", "bytes */%d" % size)
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+            self.send_response(206 if partial else 200)
             self.send_header("Content-Type", ctype)
-            self.send_header("Content-Length", str(size))
+            self.send_header("Accept-Ranges", "bytes")
+            self.send_header("Content-Length", str(end - start + 1))
+            self.send_header("Cache-Control", "private, max-age=3600")
+            if partial:
+                self.send_header("Content-Range", "bytes %d-%d/%d" % (start, end, size))
             if download_name:
                 self.send_header("Content-Disposition", 'attachment; filename="%s"' % re.sub(r'[^\w.\- ]', "_", download_name))
             self.end_headers()
+            if self.command == "HEAD":
+                return
             with open(path, "rb") as f:
-                shutil.copyfileobj(f, self.wfile)
+                f.seek(start)
+                left = end - start + 1
+                try:
+                    while left > 0:
+                        chunk = f.read(min(1 << 20, left))
+                        if not chunk:
+                            break
+                        self.wfile.write(chunk)
+                        left -= len(chunk)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass   # the browser moved on (seeking, next photo)
 
         def _authed(self, qs):
             tok = self.headers.get("X-Rewind-Token") or qs.get("t")
@@ -454,6 +504,11 @@ def make_handler(app, remote=False):
                     tp, ct = app.thumb(int(p.rsplit("/", 1)[1]))
                     if not tp:
                         return self._send(404, {"error": "no preview"})
+                    return self._file(tp, ct)
+                if p.startswith("/api/view/"):
+                    tp, ct = app.view(int(p.rsplit("/", 1)[1]))
+                    if not tp:
+                        return self._send(404, {"error": "no file"})
                     return self._file(tp, ct)
                 if p.startswith("/api/file/"):
                     it = app.cat.get(int(p.rsplit("/", 1)[1]))

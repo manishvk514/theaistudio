@@ -26,8 +26,8 @@ def build(python_dir=None):
     with open(os.path.join(APP, "Contents", "Info.plist"), "wb") as f:
         plistlib.dump({
             "CFBundleName": "Rewind", "CFBundleDisplayName": "Rewind",
-            "CFBundleIdentifier": "app.rewind.restore", "CFBundleVersion": "5.1",
-            "CFBundleShortVersionString": "5.1", "CFBundlePackageType": "APPL",
+            "CFBundleIdentifier": "app.rewind.restore", "CFBundleVersion": "5.2",
+            "CFBundleShortVersionString": "5.2", "CFBundlePackageType": "APPL",
             "CFBundleExecutable": "Rewind", "CFBundleIconFile": "Rewind.icns",
             "LSMinimumSystemVersion": "11.0", "NSHighResolutionCapable": True,
             "NSHumanReadableCopyright": "Runs only on your Mac.",
