@@ -164,9 +164,12 @@ def start_connect(cat, service, http_get=None):
     threading.Thread(target=work, daemon=True).start()
 
 
-def save_token(cat, service, token, http_get=None):
+def save_token(cat, service, token, http_get=None, extra=None):
+    """Store a sign-in for rclone. extra: e.g. {"client_id":..., "client_secret":...} when the
+    token came from Rewind's own app keys instead of rclone's shared app."""
     backend = SERVICES[service][0]
     fields = {"type": backend, "token": json.dumps(token)}
+    fields.update(extra or {})
     if backend == "drive":
         fields["scope"] = "drive"
     elif backend == "onedrive":

@@ -61,7 +61,15 @@ def run(ctx, params):
         if os.path.exists(os.path.join(root, cand)):
             hist = os.path.join(root, cand)
     if not hist:
-        ctx.log("No memories_history.json in this export.")
+        html_only = any(os.path.exists(os.path.join(root, c)) for c in
+                        ("html/memories_history.html", "memories_history.html", "index.html", "html/index.html"))
+        if html_only:
+            ctx.log("This Snapchat download is in the web-page (HTML) format, which doesn't include the Memories "
+                    "download list. Request it again at accounts.snapchat.com › My Data and choose JSON. "
+                    "Photos and videos already inside the zip were still added.")
+        else:
+            ctx.log("No memories_history.json in this export (Memories may not have been ticked). "
+                    "Photos and videos inside the zip were still added.")
         return
     with open(hist, encoding="utf-8") as f:
         data = json.load(f)

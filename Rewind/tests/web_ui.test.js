@@ -36,13 +36,14 @@ async function until(fn, ms = 30000) { const t = Date.now(); while (Date.now() -
   ok("'Add to Claude' is offered on the Mac", !!$("#claude-add"));
   ok("honest cards for Google Photos, Snapchat and iCloud",
      ["Google Photos", "Snapchat", "iCloud Photos"].every(t => $("#accounts").textContent.includes(t)));
-  $("#tg-open").click(); await sleep(200);
-  ok("Telegram connect shows its sign-in form", !!$("#tg-form [name=api_id]") && !!$("#tg-form [name=phone]"));
+  $("#tg-qr").click();
+  ok("Telegram connect asks once for its app ID, not a phone number",
+     await until(() => !!$("#tg-form [name=api_id]"), 5000) && !$("#tg-form [name=phone]"));
   $("#tg-form [name=api_id]").value = "abc";
   $("#tg-form").dispatchEvent(new w.Event("submit", {cancelable: true}));
   await until(() => $("#toast") && !$("#toast").classList.contains("hidden"), 5000);
   ok("Telegram form explains a wrong entry", /API ID/.test($("#toast").textContent));
-  $("#tg-open").click();
+  $("#tg-cancel").click();
 
   ok("Restore all button is ready", !$("#btn-restore-all").disabled && /Restore all \d+/.test($("#btn-restore-all").textContent));
   $("#btn-restore-all").click();

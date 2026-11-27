@@ -350,11 +350,16 @@ function renderAccounts() {
   const a = ST.accounts || {}, tg = ST.telegram || {};
   const svc = (id, title, what) => {
     const x = a[id] || {state: "not_connected"};
+    if (CLOUD && x.state === "waiting" && x.direct) {
+      return `<div class="acct"><div class="row"><h4>${title}</h4><span class="grow"></span><button class="ghost" data-conn="${id}">Start again</button></div>
+        <p>Sign in on the ${title} tab that opened and press <b>Allow</b>. Rewind connects by itself and starts scanning.</p></div>`;
+    }
     if (CLOUD && x.state === "waiting") {
       return `<div class="acct"><div class="row"><h4>${title}</h4><span class="grow"></span><button class="ghost" data-conn="${id}">Start again</button></div>
         <p>1. <a href="${esc(x.url || "#")}" target="_blank" rel="noopener" style="color:var(--accent)">Open the ${title} sign-in ↗</a> and press <b>Allow</b>.<br>
-        2. Your browser then shows a <i>"can't connect"</i> page. That is expected: copy its whole address and paste it here.</p>
-        <form class="pastef" data-svc="${id}"><input type="text" name="url" placeholder="http://127.0.0.1:53682/?state=…&code=…" autocomplete="off"><button class="primary">Finish</button></form></div>`;
+        2. Your browser then shows <i>"This site can't be reached"</i>. <b>Nothing is wrong</b>: copy that page's whole address and paste it here.</p>
+        <form class="pastef" data-svc="${id}"><input type="text" name="url" placeholder="http://127.0.0.1:53682/?state=…&code=…" autocomplete="off"><button class="primary">Finish</button></form>
+        <p class="small muted"><a href="/setup" target="_blank" rel="noopener" style="color:var(--accent)">Make sign-in one click (no copying) ↗</a></p></div>`;
     }
     const btn = REMOTE ? "" : x.state === "connected" ? `<button class="ghost" data-disc="${id}">Disconnect</button>`
       : x.state === "waiting" ? (x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener"><button>Open sign-in</button></a>` : `<button disabled>Waiting…</button>`)
@@ -365,10 +370,15 @@ function renderAccounts() {
   let html = claudeCard() + svc("gdrive", "Google Drive", "Downloads everything in Drive's Trash (kept 30 days) and can put it back in Drive. Also learns what's still in Drive.")
     + svc("onedrive", "OneDrive", "Learns everything still in OneDrive and catches every photo deleted after you connect, with one-tap Restore while it's in the recycle bin (30 days). Microsoft gives apps no list of the recycle bin itself, so for older deletions use <a href=\"https://onedrive.live.com/\" target=\"_blank\" rel=\"noopener\">onedrive.live.com</a> › Recycle bin.")
     + svc("dropbox", "Dropbox", "Brings back deleted files Dropbox still keeps (30 days on Basic and Plus, 180 on Professional and Business, 365 on Advanced) and can put them back in Dropbox.");
-  const tgBtn = REMOTE ? "" : tg.state === "connected" ? `<button class="ghost" data-disc="telegram">Disconnect</button>` : `<button class="primary" id="tg-open">${tgForm ? "Cancel" : "Connect"}</button>`;
+  const tgBusy = ["need_qr", "need_app", "need_password", "need_code"].includes(tg.state);
+  const tgBtn = REMOTE ? "" : tg.state === "connected" ? `<button class="ghost" data-disc="telegram">Disconnect</button>`
+    : tgBusy || tgForm ? `<button class="ghost" id="tg-cancel">Cancel</button>` : `<button class="primary" id="tg-qr">Connect</button>`;
   html += `<div class="acct"><div class="row"><h4>Telegram</h4><span class="grow"></span>${tg.state === "connected" ? `<span class="ok">✓ Connected</span>` : ""}${tgBtn}</div>
-    <p>${tg.state === "need_code" || tg.state === "need_password" ? esc(tg.message) : "Downloads every photo and video still in your chats at full quality. Messages deleted for everyone are erased on Telegram's servers and can't come back."}</p>
-    ${tgForm && tg.state !== "connected" ? tgFormHTML(tg) : ""}</div>`;
+    <p>${tgBusy || tg.state === "error" ? esc(tg.message) : "Downloads every photo and video still in your chats at full quality. Messages deleted for everyone are erased on Telegram's servers and can't come back."}</p>
+    ${tg.state === "need_qr" && tg.qr_svg ? `<div class="tgqr">${tg.qr_svg}</div>${/Android|iPhone|iPad/.test(navigator.userAgent) ? `<p class="small">On this phone? <a href="${esc(tg.qr_url)}" style="color:var(--accent)">Open in Telegram</a> instead.</p>` : ""}
+      <p class="small muted"><a href="#" id="tg-phone" style="color:var(--accent)">Use my phone number instead</a></p>` : ""}
+    ${tg.state === "need_app" || tg.state === "need_password" || tg.state === "need_code" || (tgForm && tg.state !== "connected") ? tgFormHTML(tg) : ""}</div>`;
+  html += snapCard();
   html += INFO_CARDS.map(c => `<div class="acct info"><h4>${esc(c.t)}</h4><p>${esc(c.p)}</p><p>${c.links.map(([n, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(n)} ↗</a>`).join(" · ")}</p></div>`).join("");
   if (document.activeElement && el.contains(document.activeElement)) return; // don't wipe a field being typed in
   el.innerHTML = html;
@@ -389,7 +399,10 @@ function renderAccounts() {
     try { const r = await api("/api/claude_setup", {}); $("#claude-msg").innerHTML = r.lines.map(esc).join("<br>"); } catch (e) { toast(e.message); } };
   if ($("#mcp-copy")) $("#mcp-copy").onclick = () => navigator.clipboard.writeText(CLOUD.mcp).then(() => toast("Copied"));
   $$("[data-disc]", el).forEach(b => b.onclick = async () => { if (!confirm("Disconnect this account from Rewind? Files already found stay.")) return; await api("/api/disconnect", {service: b.dataset.disc}); homeLoop(false); });
-  if ($("#tg-open")) $("#tg-open").onclick = () => { tgForm = !tgForm; renderAccounts(); };
+  if ($("#tg-qr")) $("#tg-qr").onclick = async () => { try { ST.telegram = await api("/api/telegram", {action: "qr"}); $("#tg-qr")?.blur(); renderAccounts(); homeLoop(false); } catch (e) { toast(e.message); } };
+  if ($("#tg-cancel")) $("#tg-cancel").onclick = () => { tgForm = false; ST.telegram = {...tg, state: "not_connected", message: ""}; renderAccounts(); };
+  if ($("#tg-phone")) $("#tg-phone").onclick = ev => { ev.preventDefault(); tgForm = true; ST.telegram = {...tg, state: "phone"}; renderAccounts(); };
+  if ($("#snap-up")) $("#snap-up").onchange = async e => { for (const f of e.target.files) await sendUpload(f, $("#snap-list")); e.target.value = ""; };
   if ($("#tg-form")) $("#tg-form").onsubmit = tgSubmit;
 }
 function claudeCard() {
@@ -400,7 +413,16 @@ function claudeCard() {
   return `<div class="acct"><div class="row"><h4>Use with Claude</h4><span class="grow"></span><button class="primary" id="claude-add">Add to Claude</button></div>
     <p id="claude-msg">Adds Rewind to Claude Desktop and Claude Code on this computer, so you can ask Claude to scan, show and restore. Reopen Claude Desktop afterwards.</p></div>`;
 }
+function snapCard() {
+  const how = CLOUD ? `<label class="upload small-upload"><input type="file" id="snap-up" accept=".zip" multiple hidden><span class="primary-btn">Upload the Snapchat zip</span></label><div id="snap-list" class="small"></div>`
+    : `<p class="small">Leave the downloaded zip in <b>Downloads</b>: Rewind opens it on its next scan.</p>`;
+  return `<div class="acct"><div class="row"><h4>Snapchat</h4><span class="grow"></span><a href="https://accounts.snapchat.com/" target="_blank" rel="noopener"><button>Request my data ↗</button></a></div>
+    <p>Snapchat lets no app sign in to your account, so Rewind uses Snapchat's own data download: on <b>accounts.snapchat.com › My Data</b> tick <b>Memories</b> and <b>Chat Media</b>, choose <b>JSON</b>, Submit. When Snapchat e-mails you, download the zip within a few days (its Memories links expire).</p>
+    ${how}</div>`;
+}
 function tgFormHTML(tg) {
+  if (tg.state === "need_app") return `<form id="tg-form"><p class="small">Once only: <a href="https://my.telegram.org/apps" target="_blank" rel="noopener">my.telegram.org › API development tools</a>, sign in, create any app, copy its two values here.</p>
+    <input type="text" name="api_id" placeholder="App api_id (numbers)" inputmode="numeric"><input type="text" name="api_hash" placeholder="App api_hash"><button class="primary">Continue</button></form>`;
   if (tg.state === "need_code") return `<form id="tg-form"><input type="text" name="code" placeholder="Login code from your Telegram app" inputmode="numeric" autocomplete="one-time-code"><button class="primary">Sign in</button></form>`;
   if (tg.state === "need_password") return `<form id="tg-form"><input type="password" name="password" placeholder="Telegram two-step verification password"><button class="primary">Sign in</button></form>`;
   return `<form id="tg-form"><p>Telegram asks every app for its own free API ID. Get yours once at <a href="https://my.telegram.org/apps" target="_blank" rel="noopener">my.telegram.org › API development tools</a>, then:</p>
@@ -410,12 +432,13 @@ function tgFormHTML(tg) {
 async function tgSubmit(e) {
   e.preventDefault();
   const f = Object.fromEntries(new FormData(e.target).entries());
-  const action = "code" in f ? "code" : "password" in f ? "password" : "start";
+  const action = "code" in f ? "code" : "password" in f ? "password" : "phone" in f ? "start" : "qr";
   const btn = $("button", e.target); btn.disabled = true; btn.textContent = "Working…";
   try {
     const r = await api("/api/telegram", {action, ...f});
     ST.telegram = r; document.activeElement.blur();
     if (r.state === "connected") { tgForm = false; toast("Telegram connected. Scanning your chats…"); startAuto(); }
+    else if (r.state === "need_qr") tgForm = false;
     renderAccounts();
   } catch (err) { toast(err.message); btn.disabled = false; btn.textContent = "Try again"; }
 }
@@ -474,8 +497,18 @@ async function renderPhone() {
       <label class="upload" id="dropzone"><input type="file" id="upfiles" multiple hidden><span class="primary-btn">Choose files</span></label>
       <div id="uplist" class="small"></div>
       <p class="muted small">Signed in as ${esc(CLOUD.user || "")} · <a href="/logout" style="color:var(--accent)">Sign out</a></p>`;
-    const send = async f => {
-      const row = document.createElement("div"); $("#uplist").append(row);
+    const send = f => sendUpload(f, $("#uplist"));
+    $("#upfiles").onchange = async e => { for (const f of e.target.files) await send(f); e.target.value = ""; };
+    const dz = $("#dropzone");
+    dz.ondragover = e => { e.preventDefault(); dz.classList.add("on"); };
+    dz.ondragleave = () => dz.classList.remove("on");
+    dz.ondrop = async e => { e.preventDefault(); dz.classList.remove("on"); for (const f of e.dataTransfer.files) await send(f); };
+    return;
+  }
+  return renderPhoneLocal(el);
+}
+async function sendUpload(f, list) {
+      const row = document.createElement("div"); list.append(row);
       const id = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2)).replace(/-/g, "");
       const CH = 32 << 20;
       try {
@@ -495,14 +528,8 @@ async function renderPhone() {
         row.textContent = "✓ " + f.name + (j && j.source ? " · scanning as " + j.source : "");
         homeLoop(false);
       } catch (err) { row.textContent = "✗ " + f.name + ": " + err.message; }
-    };
-    $("#upfiles").onchange = async e => { for (const f of e.target.files) await send(f); e.target.value = ""; };
-    const dz = $("#dropzone");
-    dz.ondragover = e => { e.preventDefault(); dz.classList.add("on"); };
-    dz.ondragleave = () => dz.classList.remove("on");
-    dz.ondrop = async e => { e.preventDefault(); dz.classList.remove("on"); for (const f of e.dataTransfer.files) await send(f); };
-    return;
-  }
+}
+async function renderPhoneLocal(el) {
   if (REMOTE || DISCOVER.android_local) {
     const ios = /iPhone|iPad/.test(navigator.userAgent);
     el.innerHTML = `<div class="note ok">✓ ${REMOTE ? "This phone is connected to Rewind on your laptop." : "Rewind is running on this phone."}</div>
@@ -541,6 +568,7 @@ async function renderPhone() {
 }
 
 $$("#nav button").forEach(b => { if (b.dataset.page === "phone") b.addEventListener("click", renderPhone); });
+window.addEventListener("message", e => { if (e.data === "rewind-connected") { toast("Connected. Scanning…"); homeLoop(false); } });
 if (!REMOTE && !CLOUD) {
   $("#btn-quit").classList.remove("hidden");
   $("#btn-quit").onclick = async () => { await api("/api/quit", {}); document.body.innerHTML = "<main><h2>Rewind is closed.</h2><p class='muted'>Open the Rewind app again any time.</p></main>"; };

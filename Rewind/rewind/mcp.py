@@ -83,12 +83,18 @@ TOOLS = [
      "inputSchema": _schema({"item_ids": {"type": "array", "items": {"type": "integer"}},
                              "in_service": {"type": "boolean", "default": False}})},
     {"name": "rewind_connect",
-     "description": "Connect a cloud account: gdrive, onedrive, dropbox. On the Mac the sign-in page opens by "
-                    "itself. In the cloud it returns sign_in_url: the user opens it, presses Allow, lands on a "
-                    "'can't connect' 127.0.0.1/localhost page and gives you that page's address; call again with "
-                    "pasted_url to finish. Telegram and email need codes/app passwords and are connected in "
-                    "Rewind's own window.",
-     "inputSchema": _schema({"service": {"type": "string", "enum": ["gdrive", "onedrive", "dropbox"]},
+     "description": "Connect an account. gdrive/onedrive/dropbox: on the Mac the sign-in page opens by itself; "
+                    "in the cloud it returns sign_in_url for the user to open. If the result says direct=true, "
+                    "the account connects by itself after the user presses Allow (check with rewind_status). "
+                    "Otherwise the user lands on a 'can't connect' 127.0.0.1/localhost page and gives you its "
+                    "address: call again with pasted_url. telegram: returns a QR code image; show it and tell the "
+                    "user to scan it in Telegram › Settings › Devices › Link Desktop Device (if it asks for the "
+                    "one-time API ID, pass api_id and api_hash; if it says need_password, pass password). "
+                    "snapchat: Snapchat has no sign-in for apps; returns the steps for its data download.",
+     "inputSchema": _schema({"service": {"type": "string", "enum": ["gdrive", "onedrive", "dropbox", "telegram",
+                                                                    "snapchat"]},
+                             "api_id": {"type": "string"}, "api_hash": {"type": "string"},
+                             "password": {"type": "string", "description": "Telegram two-step verification"},
                              "pasted_url": {"type": "string", "description": "Cloud only: the address the browser "
                                             "ended on after pressing Allow (starts with http://127.0.0.1:53682 or "
                                             "http://localhost:53682)"}}, ["service"])},
@@ -220,7 +226,19 @@ class Tools:
         except Exception as e:
             return {"item_id": i, "ok": False, "message": str(e)}
 
-    def t_connect(self, service, pasted_url=None):
+    def t_connect(self, service, pasted_url=None, api_id=None, api_hash=None, password=None):
+        if service == "telegram":
+            return self._telegram(api_id, api_hash, password)
+        if service == "snapchat":
+            where = ("upload it here: %s/#upload" % self.base_url) if self.base_url else \
+                "leave the downloaded zip in Downloads: Rewind opens it on its next scan"
+            return {"steps": ["Open https://accounts.snapchat.com and sign in.",
+                              "My Data: tick Memories (and Chat Media), choose the JSON format, press Submit.",
+                              "Snapchat e-mails a download link (minutes to a day). Download the zip within a few "
+                              "days: its Memories links expire.",
+                              "Then " + where + "."],
+                    "why": "Snapchat gives no app access to accounts; its data download is the only official way. "
+                           "Opened snaps that were never saved are deleted from Snapchat's servers."}
         if hasattr(self.app, "connect_link"):           # cloud
             return self.app.connect_link(service, pasted_url)
         from .sources import connect
@@ -237,6 +255,31 @@ class Tools:
                       "is connected; then run rewind_scan.")
         return st
 
+    def _telegram(self, api_id, api_hash, password):
+        from .sources import telegram_cloud
+        tg = telegram_cloud.get(self.app.cat)
+        if password:
+            st = tg.password(password)
+        elif tg.state == "connected" and not (api_id or api_hash):
+            st = tg.status()
+        else:
+            st = tg.qr_start(api_id, api_hash)
+        if st["state"] == "connected":
+            return {"state": "connected", "note": "Telegram is connected. Run rewind_scan to download chat media."}
+        if st["state"] == "need_app":
+            return {"state": "need_app", "note": st["message"], "link": "https://my.telegram.org/apps"}
+        if st["state"] == "need_qr" and st.get("qr_url"):
+            out = [{"type": "text", "text": "Scan this with the Telegram app on your phone: Settings › Devices › "
+                                            "Link Desktop Device. It is valid for about 30 seconds; call "
+                                            "rewind_connect telegram again for a fresh one. Then check rewind_status."}]
+            png = _qr_png(st["qr_url"])
+            if png:
+                out.append({"type": "image", "data": base64.b64encode(png).decode(), "mimeType": "image/png"})
+            if self.base_url:
+                out.append({"type": "text", "text": "Or open %s and press Connect next to Telegram." % self.base_url})
+            return out
+        return {"state": st["state"], "note": st.get("message")}
+
     def t_where_to_look(self, service=None):
         from .knowledge import routes_for
         return routes_for(service)
@@ -245,6 +288,17 @@ class Tools:
         return {"url": (self.base_url or "") + "/#upload",
                 "note": "Open this link, sign in with Hugging Face, and drop the files there. Large exports can take "
                         "a while to upload; each one is scanned by itself."}
+
+
+def _qr_png(text):
+    try:
+        import io
+        import segno
+        buf = io.BytesIO()
+        segno.make(text, error="m").save(buf, kind="png", scale=8, border=3)
+        return buf.getvalue()
+    except Exception:
+        return None
 
 
 def _content(result):

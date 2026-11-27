@@ -161,10 +161,24 @@ Mac or phone** (it runs in Hugging Face's data centre), so it works on:
 
 Only you can open it: it asks you to **Sign in with Hugging Face** and lets in only the Space's owner.
 
-**Connecting an account there** takes one extra step, because Google, Microsoft and Dropbox send you back to
-`127.0.0.1` (that is how the open-source helper rclone signs in without a registered developer app): press **Connect**,
-press **Allow** on the sign-in page, then copy the address of the "can't connect" page you land on and paste it into the box
-Rewind shows. The address holds a one-time code; nothing else is shared.
+**Connecting accounts there:**
+
+- **Telegram:** press **Connect** and scan the QR code with the Telegram app on your phone (Settings › Devices ›
+  Link Desktop Device). No phone number, no code. Telegram requires a free app ID once
+  ([my.telegram.org › API development tools](https://my.telegram.org/apps)); type it once, or add it to the Space's
+  secrets as `TELEGRAM_API_ID` and `TELEGRAM_API_HASH`. From Claude: "connect my Telegram" shows the QR code in the chat.
+- **OneDrive, Google Drive, Dropbox, one click:** open `https://<your-space>.hf.space/setup` once. It shows, for each
+  service, the free app keys to create and the exact address to paste. Add them as Space secrets
+  (`MS_CLIENT_ID`/`MS_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, `DROPBOX_APP_KEY`/`DROPBOX_APP_SECRET`).
+  Then Connect → sign in → Allow, and you are back in Rewind, connected and scanning. Nothing to copy.
+- **Without those keys** Connect still works, with one extra step: after **Allow** the browser shows "This site can't be
+  reached". Nothing is wrong. Copy that page's address and paste it into the box Rewind shows (that is how the
+  open-source helper rclone signs in without registered app keys).
+- **Snapchat** has no sign-in for apps. The Snapchat card has **Request my data** (choose JSON, tick Memories and Chat
+  Media) and an upload button for the zip Snapchat e-mails you.
+- **OneDrive's recycle bin:** Microsoft gives apps no list of a personal OneDrive's recycle bin. Rewind catches every
+  photo deleted *after* you connect (and restores it); for older ones open onedrive.live.com › Recycle bin ›
+  **Restore all items**, then scan again.
 
 **Keep results across restarts:** in the Space's Settings, attach a storage bucket mounted at `/data`. Without it, the
 Space starts empty after each restart (sleep, rebuild).

@@ -168,6 +168,33 @@ def login_page(next_url, cfg, error=""):
 document.getElementById('go').target='_blank';}</script>""" % (msg, setup, html.escape(href), html.escape(cfg.base)))
 
 
+def setup_page(cfg):
+    from .sources import oauth_direct
+    sid = os.environ.get("SPACE_ID", "")
+    settings = "https://huggingface.co/spaces/%s/settings" % sid if sid else "the Space's Settings page"
+    cards = []
+    for key, p in oauth_direct.PROVIDERS.items():
+        on = oauth_direct.configured(key)
+        steps = "".join("<li>%s</li>" % html.escape(x) for x in p["steps"])
+        cards.append("""<h2>%s %s</h2>%s<ol>%s</ol>
+<p>Address to paste: <code>%s</code></p>
+<p>Then in <a href="%s" target="_blank" rel="noopener">%s</a> › Variables and secrets add two <b>secrets</b>:
+<code>%s</code> and <code>%s</code>. The Space restarts by itself.</p>%s
+<p><a class="b g" href="%s" target="_blank" rel="noopener">Open the %s developer page ↗</a></p><hr>""" % (
+            html.escape(p["title"]), "✓ one-click is on" if on else "",
+            "" if on else "<p>Right now Connect uses the copy-the-address method. Do this once to make it one click:</p>",
+            steps, html.escape(oauth_direct.redirect_uri(cfg.base, key)), html.escape(settings),
+            "Space settings", p["env"][0], p["env"][1],
+            ("<p><small>%s</small></p>" % html.escape(p["note"])) if p["note"] else "",
+            html.escape(p["console"]), html.escape(p["title"])))
+    tg = ("<h2>Telegram</h2><p>Optional: add secrets <code>TELEGRAM_API_ID</code> and <code>TELEGRAM_API_HASH</code> "
+          "(from <a href='https://my.telegram.org/apps' target='_blank' rel='noopener'>my.telegram.org › API development "
+          "tools</a>) so Rewind never asks for them. Sign-in itself is a QR code you scan in the Telegram app.</p>")
+    body = ("<h1>One-click sign-in</h1><p>Free, done once. It lets Google, Microsoft and Dropbox send you straight "
+            "back to this Rewind after you press Allow.</p><hr>" + "".join(cards) + tg)
+    return PAGE.format(body=body).replace("max-width:460px", "max-width:760px")
+
+
 def consent_page(client_name, user, form_token):
     return page("""<h1>Allow %s to use Rewind?</h1>
 <p>It will be able to scan your connected accounts and uploads, look at what was found, and restore photos and
@@ -200,9 +227,17 @@ class SpaceApp:
         return "/dl/" + self.signer.sign("dl", {"f": zip_name}, 24 * 3600)
 
     def connect_link(self, service, pasted_url=None):
-        from .sources import connect
+        from .sources import connect, oauth_direct
         if service not in connect.SERVICES:
             raise ValueError("Unknown service. Use gdrive, onedrive or dropbox.")
+        if not pasted_url and oauth_direct.configured(service):
+            state = self.signer.sign("prov", {"s": service}, 900)
+            connect.STATE[service] = {"state": "waiting", "direct": True,
+                                      "message": "Sign in on the %s page and press Allow; Rewind connects by itself."
+                                                 % connect.SERVICES[service][1]}
+            return {"sign_in_url": oauth_direct.auth_url(service, self.cfg.base, state), "direct": True,
+                    "steps": ["Open sign_in_url, sign in and press Allow. Rewind connects by itself and starts "
+                              "scanning; nothing to copy back."]}
         if pasted_url:
             st = connect.headless_finish(self.app.cat, service, pasted_url)
             self.app.start_scan("auto", {})
@@ -213,7 +248,8 @@ class SpaceApp:
                           "Your browser then shows a 'can't connect' page on 127.0.0.1 or localhost: that is expected.",
                           "Copy that page's whole address and give it back (rewind_connect with pasted_url, "
                           "or paste it in Rewind's Accounts box)."],
-                "expires": "Finish within 10 minutes."}
+                "expires": "Finish within 10 minutes.",
+                "one_click": "To skip the copy step, add this Space's own app keys once: %s/setup" % self.cfg.base}
 
     # -- who is asking
 
@@ -355,10 +391,18 @@ def make_space_handler(app, sp):
                     return self._file(fp, "application/zip", os.path.basename(fp))
                 if p == "/mcp":
                     return self._send(405, {"error": "Use POST"}, extra=dict(self._cors(), Allow="POST"))
+                if p.startswith("/oauth/") and p.endswith("/callback"):
+                    return self._provider_callback(p.split("/")[2], qs)
+                if p == "/setup":
+                    if not sp.session_user(self):
+                        return self._redirect("/login?next=/setup")
+                    return self._send(200, setup_page(cfg), "text/html; charset=utf-8")
                 if p == "/api/space":
                     if not self._authed(qs):
                         return self._send(403, {"error": "forbidden"})
+                    from .sources import oauth_direct
                     return self._send(200, {"mcp": cfg.base + "/mcp", "user": sp.session_user(self),
+                                            "one_click": {k: oauth_direct.configured(k) for k in oauth_direct.PROVIDERS},
                                             "persistent": app.cat.workspace.startswith("/data"),
                                             "ephemeral_secret": cfg.ephemeral_secret})
             except Exception as e:
@@ -399,6 +443,8 @@ def make_space_handler(app, sp):
                     try:
                         return self._send(200, sp.connect_link(body.get("service"), body.get("url") or ""))
                     except (ValueError, RuntimeError) as e:
+                        print("%s connect_finish %s -> %s" % (time.strftime("%H:%M:%S"), body.get("service"), e),
+                              flush=True)
                         return self._send(400, {"error": str(e)})
                 if p == "/api/upload_part":
                     return self._upload_part(dict(urllib.parse.parse_qsl(u.query)))
@@ -406,6 +452,34 @@ def make_space_handler(app, sp):
                 traceback.print_exc()
                 return self._send(500, {"error": str(e)})
             return super().do_POST()
+
+        # ---- coming back from Google / Microsoft / Dropbox
+        def _provider_callback(self, service, qs):
+            from .sources import connect, oauth_direct
+
+            def done(ok, msg):
+                script = ("<script>try{if(window.opener){window.opener.postMessage('rewind-connected','*');"
+                          "setTimeout(function(){window.close()},1200)}}catch(e){}</script>") if ok else ""
+                return self._send(200 if ok else 400, page(
+                    "<h1>%s</h1><p>%s</p><a class='b' href='/'>Back to Rewind</a>%s" % (
+                        "Connected" if ok else "Not connected", html.escape(msg), script)), "text/html; charset=utf-8")
+            st = sp.signer.unsign("prov", qs.get("state", ""))
+            if service not in oauth_direct.PROVIDERS or not st or st["s"] != service:
+                return done(False, "This sign-in link expired or came from somewhere else. Press Connect again in Rewind.")
+            if not sp.session_user(self):
+                return done(False, "Sign in to Rewind first, then press Connect again.")
+            if "code" not in qs:
+                connect.STATE[service] = {"state": "error", "message": "Sign-in was cancelled."}
+                return done(False, "Sign-in was cancelled (%s)." % (qs.get("error_description") or qs.get("error") or
+                                                                    "no code"))
+            try:
+                title = oauth_direct.exchange(app.cat, service, cfg.base, qs["code"])
+            except Exception as e:
+                print("%s oauth %s -> %s" % (time.strftime("%H:%M:%S"), service, e), flush=True)
+                connect.STATE[service] = {"state": "error", "message": str(e)}
+                return done(False, str(e))
+            app.start_scan("auto", {})
+            return done(True, "%s is connected. Rewind is scanning it now; you can close this tab." % title)
 
         # ---- Hugging Face sign-in
         def _login(self, next_url):

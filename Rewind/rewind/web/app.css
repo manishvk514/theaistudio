@@ -134,3 +134,8 @@ button.big{padding:13px 22px;font-size:16px;border-radius:13px}
 @media(max-width:860px){.twocol{grid-template-columns:1fr}}
 @media(max-width:600px){.scanhero{flex-direction:column;text-align:center;padding:22px}.sh-text h1{font-size:22px}
 .bigscan{width:130px;height:130px}.counters{gap:8px}.counter{padding:12px}.counter b{font-size:24px}.counter span{font-size:12px}}
+
+/* Telegram QR sign-in */
+.tgqr { display: inline-block; background: #fff; padding: 10px; border-radius: 14px; margin: 6px 0 4px; }
+.tgqr svg { display: block; width: 200px; height: 200px; }
+.small-upload .primary-btn { font-size: 14px; padding: 8px 14px; }

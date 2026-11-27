@@ -26,11 +26,11 @@ sleep 2
 bash "$RES/launcher.sh"; rc=$?
 P1=$(port)
 ok "launcher exits cleanly after opening the window" '[ $rc = 0 ]'
-ok "window opened only after the engine answered" 'grep -q "http://127.0.0.1:$P1/" "$T/open.calls" && curl -s --noproxy "*" "http://127.0.0.1:$P1/health" | grep -q "\"version\": \"5.0\""'
+ok "window opened only after the engine answered" 'grep -q "http://127.0.0.1:$P1/" "$T/open.calls" && curl -s --noproxy "*" "http://127.0.0.1:$P1/health" | grep -q "\"version\": \"5.1\""'
 ok "skipped the busy port 8777 (picked $P1)" '[ "$P1" != 8777 ] && [ -n "$P1" ]'
 ok "stopped the old engine left on 8765" '! curl -s -m 2 --noproxy "*" http://127.0.0.1:8765/health | grep -q rewind'
 ok "the other program on 8777 was left alone" 'kill -0 $OTHER'
-ok "log written to ~/Library/Logs/Rewind/rewind.log" 'grep -q "engine answers on" "$LOG" && grep -q "Rewind 5.0 starting" "$LOG"'
+ok "log written to ~/Library/Logs/Rewind/rewind.log" 'grep -q "engine answers on" "$LOG" && grep -q "Rewind 5.1 starting" "$LOG"'
 
 N1=$(pgrep -f -- "-m rewind( |$)" | wc -l)
 bash "$RES/launcher.sh"

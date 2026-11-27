@@ -298,9 +298,9 @@ def qr_svg(text):
     try:
         import segno  # optional
         import io
-        buf = io.StringIO()
+        buf = io.BytesIO()          # segno writes bytes for SVG
         segno.make(text, error="m").save(buf, kind="svg", scale=6, border=2, dark="#000", light="#fff")
-        return buf.getvalue()
+        return buf.getvalue().decode("utf-8")
     except Exception:
         return None
 
@@ -541,6 +541,8 @@ def make_handler(app, remote=False):
                 if p == "/api/telegram":
                     tg = telegram_cloud.get(app.cat)
                     a = body.get("action")
+                    if a == "qr":
+                        return self._send(200, tg.qr_start(body.get("api_id"), body.get("api_hash")))
                     if a == "start":
                         return self._send(200, tg.start(body.get("api_id"), body.get("api_hash"), body.get("phone")))
                     if a == "code":
@@ -579,6 +581,7 @@ def make_handler(app, remote=False):
                     shutil.rmtree(os.path.join(app.cat.workspace, "thumbs"), ignore_errors=True)
                     return self._send(200, {"ok": True})
             except ValueError as e:      # a plain "please fix this" for the person
+                print("%s %s -> %s" % (time.strftime("%H:%M:%S"), p, e), flush=True)   # visible in logs
                 return self._send(400, {"error": str(e)})
             except Exception as e:
                 traceback.print_exc()
